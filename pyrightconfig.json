@@ -1,0 +1,30 @@
+{
+  "exclude": [
+    "**/node_modules/**",
+    "**/__pycache__/**",
+    "**/.venv/**",
+    "**/.git/**",
+    "**/.tox/**",
+    "**/.mypy_cache/**",
+    "**/.pytest_cache/**",
+    "dataset",
+    "outputs",
+    "sapeins_configs",
+    "lightning_logs",
+    "experiments",
+    "wandb",
+  ],
+  "include": [
+    "scripts/**",
+    "model/**",
+    "modules/**",
+    "tests/**",
+    "data/**",
+    "misc/**",
+    "analysis/**"
+  ],
+  "typeCheckingMode": "off",
+  "useLibraryCodeForTypes": true,
+  "diagnosticMode": "openFilesOnly",
+  "stubPath": "stubs",
+}
