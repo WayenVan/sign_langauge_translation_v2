@@ -60,34 +60,6 @@ class Ph14TDatasetBuilder(datasets.GeneratorBasedBuilder):
         for idx, row in enumerate(subset.to_dicts()):
             yield idx, row
 
-    def _pl_schema_to_features(self, schema: dict) -> dict:
-        """Convert Polars schema to Hugging Face features."""
-        dtype_map = {
-            pl.Int8: "int8",
-            pl.Int16: "int16",
-            pl.Int32: "int32",
-            pl.Int64: "int64",
-            pl.UInt8: "uint8",
-            pl.UInt16: "uint16",
-            pl.UInt32: "uint32",
-            pl.UInt64: "uint64",
-            pl.Float32: "float32",
-            pl.Float64: "float64",
-            pl.Boolean: "bool",
-            pl.Utf8: "string",
-            pl.String: "string",
-            pl.Date: "string",  # or consider using ClassLabel if it's a category
-            pl.Datetime: "string",
-        }
-
-        features = {}
-        for name, dtype in schema.items():
-            # Match polars datatype to datasets.Value
-            dtype_str = dtype_map.get(dtype, "string")  # fallback to string
-            features[name] = datasets.Value(dtype_str)
-
-        return features
-
 
 def build_tables(data_root: str, mode: str = "train"):
     raw_annotation = pl.read_csv(

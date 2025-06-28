@@ -27,13 +27,6 @@ import datetime
 from misc.git_utils import save_git_info
 from typing import Any, Dict
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-filename = os.path.basename(__file__).split(".")[0]
-cv2.setNumThreads(0)  # NOTE: set the number of threads to 0 to avoid cv2 error
-
-local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-global_rank = int(os.environ.get("RANK", "0"))
-
 
 def init_output_dir(file_name: str) -> str:
     """
@@ -60,53 +53,14 @@ def init_logger(local_rank, output_dir: str):
     )
 
 
-# NOTE: get or initialize the output directory
-output_dir = os.environ.get(
-    filename.upper() + "_OUTPUT_DIR",
-    None,
-)
-if output_dir is None:
-    print(f"Output directory not found in environment variables, initializing...")
-    output_dir = init_output_dir(filename)
-    os.environ[filename.upper() + "_OUTPUT_DIR"] = output_dir
-
-# NOTE: initialize the logger
-init_logger(local_rank, output_dir)
-logger = logging.getLogger(__name__)
-logger.info(f"Output directory: {output_dir}")
-
-
 # NOTE: the hydra appp only inisitalize once
 @hydra.main(
-    config_path="../configs", config_name="slt_quantized_8a100", version_base="1.3.2"
+    config_path="../configs",
+    config_name="slt_quantized_8a100",
+    version_base="1.3.2",
 )
 def main(cfg: DictConfig) -> None:
     train(cfg)
-
-
-def init_output_dir(config_name: str) -> str:
-    """
-    Initialize the output directory for the job.
-    """
-    now = datetime.datetime.now()
-    subfolder = now.strftime("%Y-%m-%d_%H-%M-%S")
-    output_dir = os.path.join("outputs", config_name, subfolder)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    return output_dir
-
-
-def init_logger(local_rank, output_dir: str):
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.StreamHandler(),  # Stream handler for console output
-            logging.FileHandler(
-                os.path.join(output_dir, f"train_rank{local_rank}.log")
-            ),  # File handler for logging to a file
-        ],
-    )
 
 
 def train(
@@ -189,7 +143,10 @@ class DebugCallback(callbacks.Callback):
         self.logger = logging.getLogger("debug_callback")
 
     def on_before_backward(
-        self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", loss: torch.Tensor
+        self,
+        trainer: "pl.Trainer",
+        pl_module: "pl.LightningModule",
+        loss: torch.Tensor,
     ) -> None:
         # NOTE: check the loss
         if torch.isnan(loss).any():
@@ -232,4 +189,25 @@ class DebugCallback(callbacks.Callback):
 
 
 if __name__ == "__main__":
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    filename = os.path.basename(__file__).split(".")[0]
+    cv2.setNumThreads(0)  # NOTE: set the number of threads to 0 to avoid cv2 error
+
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+    global_rank = int(os.environ.get("RANK", "0"))
+    # NOTE: get or initialize the output directory
+    output_dir = os.environ.get(
+        filename.upper() + "_OUTPUT_DIR",
+        None,
+    )
+    if output_dir is None:
+        print(f"Output directory not found in environment variables, initializing...")
+        output_dir = init_output_dir(filename)
+        os.environ[filename.upper() + "_OUTPUT_DIR"] = output_dir
+
+    # NOTE: initialize the logger
+    init_logger(local_rank, output_dir)
+    logger = logging.getLogger(__name__)
+    logger.info(f"Output directory: {output_dir}")
+
     main()

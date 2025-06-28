@@ -254,7 +254,6 @@ class SLRCLIP(nn.Module):
         super(SLRCLIP, self).__init__()
         self.model_txt = TextCLIP(config, inplanes=embed_dim, planes=embed_dim)
         self.model_images = ImageCLIP(config, inplanes=embed_dim, planes=embed_dim)
-
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
     def get_model_txt(self):

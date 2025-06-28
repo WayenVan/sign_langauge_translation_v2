@@ -16,10 +16,10 @@ from lightning.pytorch.loggers import WandbLogger
 import lightning.pytorch as pl
 import torch
 
-from model import SLTModelForT5FineTune, ModelForT5TextPretrain
-from model.mbart_slt import MBartSLTModel
+# from model.slt_vision_pretrain import SignBackboneForVPretraining
+# from model.t5_text_pretrain import ModelForT5TextPretrain
+# from model.mbart_slt import MBartSLTModel
 from model.quantize_slt import MBartQuantizedSLTModel
-
 import cv2
 
 import datetime
@@ -27,33 +27,14 @@ import datetime
 from misc.git_utils import save_git_info
 from typing import Any, Dict
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-cv2.setNumThreads(0)  # NOTE: set the number of threads to 0 to avoid cv2 error
 
-local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-global_rank = int(os.environ.get("RANK", "0"))
-
-
-# NOTE: the hydra appp only inisitalize once
-@hydra.main(
-    # config_path="../configs", config_name="t5_text_pretrain_8a100", version_base="1.3.2"
-    config_path="../configs",
-    # config_name="slt_finetune_8a100",
-    config_name="slt_quantized_8a100",
-    version_base="1.3.2",
-)
-def main(cfg: DictConfig) -> None:
-    hydra_config = hydra.core.hydra_config.HydraConfig.get()
-    train(cfg, hydra_config)
-
-
-def init_output_dir(config_name: str) -> str:
+def init_output_dir(file_name: str) -> str:
     """
     Initialize the output directory for the job.
     """
     now = datetime.datetime.now()
     subfolder = now.strftime("%Y-%m-%d_%H-%M-%S")
-    output_dir = os.path.join("outputs", config_name + "test", subfolder)
+    output_dir = os.path.join("outputs", file_name, subfolder)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     return output_dir
@@ -72,40 +53,35 @@ def init_logger(local_rank, output_dir: str):
     )
 
 
+# NOTE: the hydra appp only inisitalize once
+@hydra.main(
+    config_path="../configs",
+    config_name="gfslt-vlp_pretrain_8a100",
+    version_base="1.3.2",
+)
+def main(cfg: DictConfig) -> None:
+    train(cfg)
+
+
 def train(
     cfg: DictConfig,
-    hydra_config: DictConfig,
 ) -> None:
+    hydra_config = hydra.core.hydra_config.HydraConfig.get()
     config_name = hydra_config.job.config_name
-
-    output_dir = os.environ.get(
-        config_name.upper() + "_OUTPUT_DIR",
-        None,
-    )
-    if output_dir is None:
-        print("Output directory not found in environment variables, initializing...")
-        output_dir = init_output_dir(config_name)
-        os.environ[config_name.upper() + "_OUTPUT_DIR"] = output_dir
-
-    init_logger(local_rank, output_dir)
-    logger = logging.getLogger(__name__)
-    logger.info(f"Output directory: {output_dir}")
 
     # NOTE: define callbacks for trainer
     cbs = [
         callbacks.RichProgressBar(),
-        DebugCallback(),
+        # DebugCallback(),
     ]
-
-    cfg.data.datamodule.num_workers = 1
 
     # NOTE: start training
     t = Trainer(
         accelerator="gpu",
         strategy="ddp_find_unused_parameters_true",
-        devices=[0],
+        devices=getattr(cfg, "devices", "auto"),
         callbacks=cbs,
-        log_every_n_steps=50,
+        log_every_n_steps=cfg.log_interval,
         max_epochs=cfg.max_epochs,
         gradient_clip_val=1.0,  # NOTE: gradient clipping will be normed
         # gradient_clip_algorithm="value",
@@ -116,23 +92,10 @@ def train(
         # detect_anomaly=True,
     )
 
-    if t.is_global_zero:
-        # NOTE: save git info
-        save_git_info(
-            repo_path=project_root,
-            info_path=os.path.join(output_dir, "git_info"),
-        )
-
     logger.info(f"Process in local rank {t.local_rank}, global rank {t.global_rank}")
 
     datamodule = instantiate(cfg.data.datamodule, cfg)
-    # model = instantiate(cfg.model, cfg)
-    # model.load_from_pretrained(
-    #     "outputs/t5_text_pretrain_8a100/2025-06-18_19-56-11/epoch=79-val_generate_bleu=0.5015-blo6e98y.ckpt"
-    # )
-    # model = SLTModelForT5FineTune.load_from_checkpoint(cfg.ckpt, cfg=cfg)
-    # model = MBartSLTModel(cfg=cfg)
-    model = MBartQuantizedSLTModel(cfg=cfg)
+    model = MBartQuantizedSLTModel(cfg)
     t.fit(model, datamodule=datamodule)
 
 
@@ -140,19 +103,6 @@ class DebugCallback(callbacks.Callback):
     def __init__(self):
         super().__init__()
         self.current_train_batch = None
-        self.logger = logging.getLogger("debug_callback")
-
-    def on_train_start(
-        self, trainer: pl.Trainer, pl_module: pl.LightningModule
-    ) -> None:
-        # for name, param in pl_module.named_parameters():
-        #     self.logger.info(
-        #         f"Parameter {name} - requires_grad: {param.requires_grad}, shape: {param.shape}, mean: {param.mean()}, std: {param.std()}"
-        #     )
-        # self.logger.info(
-        #     f"Training started with model: {pl_module.__class__.__name__}, global rank: {trainer.global_rank}, local rank: {trainer.local_rank}"
-        # )
-        pass
 
     def on_train_batch_start(
         self,
@@ -162,22 +112,25 @@ class DebugCallback(callbacks.Callback):
         batch_idx: int,
     ) -> None:
         self.current_train_batch = batch
+        self.logger = logging.getLogger("debug_callback")
 
     def on_before_backward(
-        self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", loss: torch.Tensor
+        self,
+        trainer: "pl.Trainer",
+        pl_module: "pl.LightningModule",
+        loss: torch.Tensor,
     ) -> None:
-        pass
-        # # NOTE: check the loss
-        # if torch.isnan(loss).any():
-        #     video = self.current_train_batch["video"]
-        #     ids = self.current_train_batch["ids"]
-        #
-        #     logger.warning(f"Loss is NaN: {loss}")
-        #     logger.warning(
-        #         f"Video shape: {video.shape}, mean: {video.mean()}, std: {video.std()}"
-        #     )
-        #     logger.warning(f"input_ids: {ids}")
-        # trainer.should_stop = True
+        # NOTE: check the loss
+        if torch.isnan(loss).any():
+            video = self.current_train_batch["video"]
+            ids = self.current_train_batch["ids"]
+
+            self.logger.warning(f"Loss is NaN: {loss}")
+            self.logger.warning(
+                f"Video shape: {video.shape}, mean: {video.mean()}, std: {video.std()}"
+            )
+            self.logger.warning(f"input_ids: {ids}")
+            # trainer.should_stop = True
 
     def on_before_optimizer_step(
         self,
@@ -186,15 +139,47 @@ class DebugCallback(callbacks.Callback):
         optimizer: Any,
     ) -> None:
         nan_flag = False
-        if trainer.is_global_zero:
-            for name, param in pl_module.named_parameters():
-                if param.grad is not None:
-                    self.logger.info(
-                        f"Parameter {name} - GRADE, mean: {param.grad.mean()}, std: {param.grad.std()}"
-                    )
+        for name, param in pl_module.named_parameters():
+            global_step = trainer.global_step
 
+            if torch.isnan(param).any():
+                nan_flag = True
+                self.logger.warning(
+                    f"In Step {global_step}, Param {name} has mean: {param.mean()}, std: {param.std()}"
+                )
+            if param.grad is not None and torch.isnan(param.grad).any():
+                nan_flag = True
+                self.logger.warning(
+                    f"In Step {global_step}, Param {name} has grad mean: {param.grad.mean()}, std: {param.grad.std()}"
+                )
+        # if nan_flag and global_step >= 1000:
+        #     logger.warning(
+        #         "find nan and the global step is larger than 1000, stop the training"
+        #     )
+        #     trainer.should_stop = True
         return
 
 
 if __name__ == "__main__":
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    filename = os.path.basename(__file__).split(".")[0]
+    cv2.setNumThreads(0)  # NOTE: set the number of threads to 0 to avoid cv2 error
+
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+    global_rank = int(os.environ.get("RANK", "0"))
+    # NOTE: get or initialize the output directory
+    output_dir = os.environ.get(
+        filename.upper() + "_OUTPUT_DIR",
+        None,
+    )
+    if output_dir is None:
+        print(f"Output directory not found in environment variables, initializing...")
+        output_dir = init_output_dir(filename)
+        os.environ[filename.upper() + "_OUTPUT_DIR"] = output_dir
+
+    # NOTE: initialize the logger
+    init_logger(local_rank, output_dir)
+    logger = logging.getLogger(__name__)
+    logger.info(f"Output directory: {output_dir}")
+
     main()

@@ -1,0 +1,31 @@
+defaults:
+  - base_gfslt-vlp
+  # - override modules: dinov2_base
+  - override model: mbart_slt
+  # - override data: ph14t_*x224x224_gfslt
+  - override data: ph14t_*x224x224_mbart
+  # - override engine: adam_cosine_anneal
+
+data:
+  train:
+    loader_kwargs:
+      batch_size: 8
+  val:
+    loader_kwargs:
+      batch_size: 4
+
+max_epochs: 200
+devices: [2, 3, 4, 5, 6, 7]
+precision: bf16-mixed
+
+datamodule:
+  num_workers: 8
+
+engine:
+  optimizer:
+    lr: 1e-4
+  lr_scheduler:
+    instance:
+      eta_min: 1e-8
+
+visual_text_alignment_weight: 1.0

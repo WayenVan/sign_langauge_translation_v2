@@ -2,6 +2,7 @@ import sys
 from tqdm import tqdm
 
 sys.path.append(".")
+sys.path.append(".")
 from hydra import compose, initialize
 from hydra.utils import instantiate
 from transformers import AutoTokenizer
@@ -35,17 +36,92 @@ def test_dataset():
 
 def test_datamodule():
     initialize(config_path="../configs")
-    cfg = compose("slt_quantized_8a100")
+    cfg = compose("gfslt-vlp_pretrain_8a100")
 
     cfg.data.train.loader_kwargs.num_workers = 1
+    # cfg.data.train.loader_kwargs.prefetch_factor = None
     cfg.data.val.loader_kwargs.num_workers = 1
     cfg.data.train.loader_kwargs.batch_size = 2
 
-    datamodule = DataModule(cfg)
+    # tokenizer = AutoTokenizer.from_pretrained(
+    #     "facebook/mbart-large-cc25",
+    #     # use_fast=False,
+    #     src_lang="de_DE",
+    #     tgt_lang="de_DE",
+    # )
+    tokenizer = AutoTokenizer.from_pretrained(
+        "facebook/mbart-large-50-many-to-many-mmt",
+        # use_fast=False,
+    )
+    tokenizer.src_lang = "de_DE"
+    tokenizer.tgt_lang = "de_DE"
+
+    datamodule = DataModule(cfg.data, tokenizer=tokenizer)
     datamodule.setup("fit")
     train_dataloader = datamodule.train_dataloader()
+    # train_dataloader = datamodule.val_dataloader()
     for batch in tqdm(train_dataloader):
-        print(batch["video"].shape)
+        print(batch)
+
+
+from hydra import compose, initialize
+from hydra.utils import instantiate
+from transformers import AutoTokenizer
+from data.datamodule import DataModule
+
+
+def test_max_data_length():
+    tokenizer = AutoTokenizer.from_pretrained("dbmdz/bert-base-german-europeana-cased")
+    data_root = "/root/shared-data/sign_language_translation_llm/dataset/PHOENIX-2014-T-release-v3/"
+    ph14t_index = Ph14TIndex(data_root, mode="dev")
+    max_length = 0
+    for id in ph14t_index.ids:
+        data_info = ph14t_index.get_data_info_by_id(id)
+        text = data_info["translation"]
+        lentgh = len(tokenizer.tokenize(text))
+        if lentgh > max_length:
+            max_length = lentgh
+    print(max_length)
+
+
+def test_dataset():
+    data_root = "dataset/PHOENIX-2014-T-release-v3"
+    mode = "train"
+
+    dataset = Ph14TDataset(data_root, mode)
+
+    for i in tqdm(range(len(dataset))):
+        data = dataset[i]
+        print(data["video"].shape)
+
+
+def test_datamodule():
+    initialize(config_path="../configs")
+    cfg = compose("gfslt-vlp_pretrain_8a100")
+
+    cfg.data.train.loader_kwargs.num_workers = 1
+    # cfg.data.train.loader_kwargs.prefetch_factor = None
+    cfg.data.val.loader_kwargs.num_workers = 1
+    cfg.data.train.loader_kwargs.batch_size = 2
+
+    # tokenizer = AutoTokenizer.from_pretrained(
+    #     "facebook/mbart-large-cc25",
+    #     # use_fast=False,
+    #     src_lang="de_DE",
+    #     tgt_lang="de_DE",
+    # )
+    tokenizer = AutoTokenizer.from_pretrained(
+        "facebook/mbart-large-50-many-to-many-mmt",
+        # use_fast=False,
+    )
+    tokenizer.src_lang = "de_DE"
+
+    datamodule = DataModule(cfg.data, tokenizer=tokenizer)
+    datamodule.setup("fit")
+    train_dataloader = datamodule.train_dataloader()
+    # train_dataloader = datamodule.val_dataloader()
+    for batch in tqdm(train_dataloader):
+        print(batch)
         # print(batch["translation"])
         pass
 
