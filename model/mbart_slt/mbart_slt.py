@@ -18,7 +18,11 @@ from hydra.utils import instantiate
 
 from typing import List
 from transformers import get_scheduler
-from torch.optim import Optimizer
+from torch import optim
+from torch.optim import lr_scheduler as scheduler
+from timm.optim import create_optimizer_v2
+from timm.scheduler import create_scheduler_v2
+
 from torch.nn import functional as F
 from misc.earth_mover_loss import masked_emd_batch
 from misc.sign_cl import SignCL
@@ -52,6 +56,9 @@ def build_mlp(depth, hidden_size, output_hidden_size):
     return nn.Sequential(*modules)
 
 
+MAX_TOKEN_LENGTH = 1024  # Maximum token length for MBart
+
+
 class MBartSLTModel(LightningModule):
     def __init__(self, cfg):
         super().__init__()
@@ -59,6 +66,8 @@ class MBartSLTModel(LightningModule):
         self.cfg: DictConfig = cfg
         self.lang = "de_DE"  # Set source language to German
         self._init_mbart_model()
+
+        self.visual_position_embedding = nn.Embedding(MAX_TOKEN_LENGTH, self.d_model)
 
         self.visual_src_lang_token = nn.Parameter(
             torch.randn(1, 1, self.d_model),
@@ -126,12 +135,17 @@ class MBartSLTModel(LightningModule):
         #     param.requires_grad = True
         for param in self.mbart.base_model.encoder.parameters():
             param.requires_grad = True
-        for param in self.mbart.base_model.shared.parameters():
-            param.requires_grad = False
+
         # for name, param in self.mbart.base_model.decoder.named_parameters():
         #     if "self_attn" in name:
         #         param.requires_grad = False
-        #
+
+        for param in self.mbart.base_model.shared.parameters():
+            param.requires_grad = False
+        for param in self.mbart.base_model.encoder.embed_positions.parameters():
+            param.requires_grad = False
+        for param in self.mbart.base_model.decoder.embed_positions.parameters():
+            param.requires_grad = False
 
     def get_eos_embedding(self):
         """
@@ -184,6 +198,19 @@ class MBartSLTModel(LightningModule):
         self.log("val_generate_bleu4", bleu4, prog_bar=True, sync_dist=True)
         self.blue4.reset()
 
+    def visual_position_embedding_forward(self, video_feats: Tensor):
+        """
+        Forward pass through the visual position embedding.
+        args:
+            video_feats: Tensor, shape [B, T, D], video features
+        """
+        B, T, D = video_feats.shape
+        position_ids = (
+            torch.arange(T, device=video_feats.device).unsqueeze(0).expand(B, -1)
+        )
+        position_embeddings = self.visual_position_embedding(position_ids)
+        return video_feats + position_embeddings  # [B, T, D]
+
     def visual_encoder_forward(self, video: Tensor, video_length: Tensor):
         """
         Forward pass through the visual encoder.
@@ -202,11 +229,13 @@ class MBartSLTModel(LightningModule):
         )  # list of [T, C, H, W]
         video_feats = pad_sequence(
             list(video_feats), batch_first=True, padding_value=0.0
-        )  # [B, T, C, H, W]
+        ).contiguous()  # [B, T, C, H, W]
 
         video_feats, video_length = self.visual_adapter(
             video_feats, video_length
         )  # [B, T, D]
+
+        video_feats = self.visual_position_embedding_forward(video_feats)
 
         visual_src_lang_token = self.visual_src_lang_token.expand(B, 1, -1)
 
@@ -216,7 +245,7 @@ class MBartSLTModel(LightningModule):
                 video_feats,  # [B, T, D]
             ],
             dim=1,
-        )  # [B, 1 + T, D]
+        ).contiguous()  # [B, 1+T, D]
 
         video_length = video_length + 1
         attention_mask = self.length_to_mask(video_length)
@@ -302,6 +331,7 @@ class MBartSLTModel(LightningModule):
             attention_mask=decoder_attn_mask,
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_attn_mask,  # [B, T] (optional, not used in this case)
+            use_cache=False,  # Disable cache for training
         )
         logits = self.mbart.lm_head(decoder_outputs.last_hidden_state)  # [B, L, C]
 
@@ -345,6 +375,8 @@ class MBartSLTModel(LightningModule):
         """
         video_input, text_src_input, masked_text_src_input = self.dispatch_batch(batch)
 
+        B = video_input["video_length"].shape[0]
+
         text_encoder_out = self.text_encoder_forward(
             masked_text_src_input["input_ids"], masked_text_src_input["attention_mask"]
         )
@@ -383,12 +415,13 @@ class MBartSLTModel(LightningModule):
             on_step=True,
             on_epoch=True,
             prog_bar=True,
+            batch_size=B,
         )
 
         # Calculate visual generate loss
         # LABEL_LENGTH = labels.shape[1]
         generate_loss_visual = F.cross_entropy(
-            rearrange(visual_logits, "b l c -> (b l) c"),
+            rearrange(visual_logits, "b l c -> (b l) c").contiguous(),
             rearrange(text_src_input["input_ids"], "b l -> (b l)"),
             ignore_index=self.tokenizer.pad_token_id,
         )
@@ -398,11 +431,12 @@ class MBartSLTModel(LightningModule):
             on_step=True,
             on_epoch=True,
             prog_bar=True,
+            batch_size=B,
         )
 
         # calculate text generate loss
         generate_loss_text = F.cross_entropy(
-            rearrange(text_logits, "b l c -> (b l) c"),
+            rearrange(text_logits, "b l c -> (b l) c").contiguous(),
             rearrange(text_src_input["input_ids"], "b l -> (b l)"),
             ignore_index=-100,
         )
@@ -412,6 +446,7 @@ class MBartSLTModel(LightningModule):
             on_step=True,
             on_epoch=True,
             prog_bar=True,
+            batch_size=B,
         )
 
         # calculate the sign contrastive loss
@@ -487,6 +522,7 @@ class MBartSLTModel(LightningModule):
             on_step=True,
             on_epoch=True,
             prog_bar=True,
+            batch_size=B,
         )
         return total_loss
 
@@ -545,7 +581,9 @@ class MBartSLTModel(LightningModule):
         visual_feats = F.normalize(visual_features, dim=-1, p=2)
         text_feats = F.normalize(text_features, dim=-1, p=2).detach()
 
-        similarity = einsum(visual_feats, text_feats, "b t d, b l d -> b t l")
+        similarity = einsum(
+            visual_feats, text_feats, "b t d, b l d -> b t l"
+        ).contiguous(())
 
         addictive_mask = text_mask.unsqueeze(1).float()
         addictive_mask = addictive_mask.masked_fill(addictive_mask == 0, float("-inf"))
@@ -561,44 +599,28 @@ class MBartSLTModel(LightningModule):
     def on_load_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         self.mbart.to(torch.bfloat16)  # Use bfloat16 for better performance on TPUs
 
-    @staticmethod
-    def get_lr_schuduler(cfg, optimizer: Optimizer):
-        lr_config = cfg.engine.lr_scheduler
-        if lr_config.type == "native" or lr_config.type == "timm":
-            return instantiate(lr_config.instance, optimizer=optimizer)
-        elif lr_config.type == "transformers":
-            # scheduler = instantiate(self.cfg.engine.lr_scheduler, opt)
-            kwarges = cfg.engine.lr_scheduler.kwargs
-            if kwarges is None:
-                kwarges = {}
-            else:
-                kwarges = OmegaConf.to_container(kwarges, resolve=True)
-
-            scheduler = get_scheduler(
-                cfg.engine.lr_scheduler.name,
-                optimizer=optimizer,
-                num_warmup_steps=cfg.engine.lr_scheduler.warmup_steps,
-                num_training_steps=cfg.engine.lr_scheduler.training_steps,
-                scheduler_specific_kwargs=kwarges,
-            )
-            return scheduler
-        else:
-            raise ValueError(
-                f"Unsupported lr scheduler type: {cfg.engine.lr_scheduler.type}"
-            )
-
     def configure_optimizers(self):
-        opt: Optimizer = instantiate(
-            self.cfg.engine.optimizer,
-            [
-                {"params": filter(lambda p: p.requires_grad, self.parameters())},
-            ],
+        optimizer = create_optimizer_v2(
+            filter(lambda p: p.requires_grad, self.parameters()),
+            **self.cfg.engine.opt.kwargs,
         )
-        scheduler = self.get_lr_schuduler(self.cfg, opt)
-        return {
-            "optimizer": opt,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                "interval": "epoch",  # or 'epoch'
+        # lr_scheduler, _ = create_scheduler_v2(
+        #     optimizer,
+        #     **self.cfg.engine.sched_encoder.kwargs,
+        # )
+        lr_scheduler = get_scheduler(
+            self.cfg.engine.sched.name,
+            optimizer=optimizer,
+            **self.cfg.engine.sched.kwargs,
+        )
+
+        return [
+            {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": lr_scheduler,
+                    "interval": "epoch",
+                    "frequency": 1,
+                },
             },
-        }
+        ]

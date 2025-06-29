@@ -1,13 +1,11 @@
-optimizer:
-  _target_: torch.optim.Adam
-  lr: 1e-5
+opt:
+  kwargs:
+    opt: adamw
+    lr: 1e-4
 
-lr_scheduler:
-  type: native
-  instance:
-    _target_: torch.optim.lr_scheduler.StepLR
-    step_size: 50
-  # name: linear
-  # warmup_steps: 0
-  # training_steps: 100
-  # kwargs: null
+sched:
+  name: cosine_with_min_lr
+  kwargs:
+    num_warmup_steps: 0
+    num_training_steps: ${max_epochs}
+    scheduler_specific_kwargs: { "min_lr": 1e-8, "num_cycles": 0.5 }

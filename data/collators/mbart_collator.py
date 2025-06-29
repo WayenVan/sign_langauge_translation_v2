@@ -49,7 +49,7 @@ class MBARTCollator:
 
         # 复制 pad_size 次
         padding = last_element.repeat_interleave(pad_size, dim=dim)
-        return torch.cat([tensor, padding], dim=dim)
+        return torch.cat([tensor, padding], dim=dim).contiguous()
 
     def __call__(self, batch):
         # Collate a batch of samples.
@@ -68,14 +68,12 @@ class MBARTCollator:
         videos = [self.pad_dim_to_multiple_of_4(video, dim=0) for video in videos]
         video_lengths = [video.size(0) for video in videos]
 
-        video_tensor = torch.cat(videos, dim=0)
+        video_tensor = torch.cat(videos, dim=0).contiguous()
         video_lengths_tensor = torch.tensor(video_lengths)
 
         # Tokenize text
         # the taget sequence will be shifted inside the text decoder, the start toeken is padding id
-        text_src_input = self.tokenizer(
-            texts, return_tensors="pt", padding=True, truncation=True
-        )
+        text_src_input = self.tokenizer(texts, return_tensors="pt", padding=True)
 
         # Prepare source input
         video_input = {
@@ -94,7 +92,7 @@ class MBARTCollator:
                 is_train=(self.phase == "train"),
             )
             masked_text_src_input = self.tokenizer(
-                masked_texts, return_tensors="pt", padding=True, truncation=True
+                masked_texts, return_tensors="pt", padding=True
             )
             return video_input, text_src_input, masked_text_src_input
 

@@ -15,11 +15,11 @@ from lightning.pytorch import callbacks
 from lightning.pytorch.loggers import WandbLogger
 import lightning.pytorch as pl
 import torch
+from data.datamodule import DataModule
 
 # from model.slt_vision_pretrain import SignBackboneForVPretraining
 # from model.t5_text_pretrain import ModelForT5TextPretrain
 # from model.mbart_slt import MBartSLTModel
-from model.quantize_slt import MBartQuantizedSLTModel
 import cv2
 
 import datetime
@@ -51,21 +51,35 @@ def init_logger(local_rank, output_dir: str):
             ),  # File handler for logging to a file
         ],
     )
+    return logging.getLogger(__name__)
+
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+filename = os.path.basename(__file__).split(".")[0]
+cv2.setNumThreads(0)  # NOTE: set the number of threads to 0 to avoid cv2 error
+
+local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+global_rank = int(os.environ.get("RANK", "0"))
+# NOTE: get or initialize the output directory
+output_dir = os.environ.get(
+    filename.upper() + "_OUTPUT_DIR",
+    None,
+)
+if output_dir is None:
+    print(f"Output directory not found in environment variables, initializing...")
+    output_dir = init_output_dir(filename)
+    os.environ[filename.upper() + "_OUTPUT_DIR"] = output_dir
 
 
 # NOTE: the hydra appp only inisitalize once
 @hydra.main(
     config_path="../configs",
-    config_name="slt_quantized_8a100",
+    config_name="gfslt-vlp_pretrain_8a100",
     version_base="1.3.2",
 )
 def main(cfg: DictConfig) -> None:
-    train(cfg)
-
-
-def train(
-    cfg: DictConfig,
-) -> None:
+    # NOTE: initialize the logger
+    logger = init_logger(local_rank, output_dir)
     hydra_config = hydra.core.hydra_config.HydraConfig.get()
     config_name = hydra_config.job.config_name
 
@@ -74,7 +88,7 @@ def train(
     wdb_config["output_dir"] = output_dir
     lt_logger = WandbLogger(
         name=config_name,
-        project="sign-langauge-translation-llm",
+        project="sign-langauge-translation-v2",
         config=wdb_config,
     )
     run_id = str(lt_logger.experiment.id)
@@ -122,8 +136,8 @@ def train(
 
     logger.info(f"Process in local rank {t.local_rank}, global rank {t.global_rank}")
 
-    datamodule = instantiate(cfg.data.datamodule, cfg)
-    model = MBartQuantizedSLTModel(cfg)
+    model = instantiate(cfg.model.type, cfg)
+    datamodule = DataModule(cfg.data, model.tokenizer)
     t.fit(model, datamodule=datamodule)
 
 
@@ -189,25 +203,4 @@ class DebugCallback(callbacks.Callback):
 
 
 if __name__ == "__main__":
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    filename = os.path.basename(__file__).split(".")[0]
-    cv2.setNumThreads(0)  # NOTE: set the number of threads to 0 to avoid cv2 error
-
-    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-    global_rank = int(os.environ.get("RANK", "0"))
-    # NOTE: get or initialize the output directory
-    output_dir = os.environ.get(
-        filename.upper() + "_OUTPUT_DIR",
-        None,
-    )
-    if output_dir is None:
-        print(f"Output directory not found in environment variables, initializing...")
-        output_dir = init_output_dir(filename)
-        os.environ[filename.upper() + "_OUTPUT_DIR"] = output_dir
-
-    # NOTE: initialize the logger
-    init_logger(local_rank, output_dir)
-    logger = logging.getLogger(__name__)
-    logger.info(f"Output directory: {output_dir}")
-
     main()

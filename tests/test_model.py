@@ -34,6 +34,8 @@ def test_slt_model():
     cfg.data.train.loader_kwargs.num_workers = 1
 
     model = instantiate(cfg.model.type, cfg).to("cuda:2")
+    for name, param in model.named_parameters():
+        print(name)
 
     data_module = DataModule(cfg.data, model.tokenizer)
     data_module.setup()
