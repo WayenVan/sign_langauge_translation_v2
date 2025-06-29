@@ -57,26 +57,6 @@ def init_logger(local_rank, output_dir: str):
     return logging.getLogger(__name__)
 
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-filename = os.path.basename(__file__).split(".")[0]
-cv2.setNumThreads(
-    0
-)  # NOTE: set the number of threads to 0 to avoid cv2 become over head
-
-local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-global_rank = int(os.environ.get("RANK", "0"))
-
-# NOTE: get or initialize the output directory
-output_dir = os.environ.get(
-    filename.upper() + "_OUTPUT_DIR",
-    None,
-)
-if output_dir is None:
-    print(f"Output directory not found in environment variables, initializing...")
-    output_dir = init_output_dir(filename)
-    os.environ[filename.upper() + "_OUTPUT_DIR"] = output_dir
-
-
 # NOTE: the hydra appp only inisitalize once
 @hydra.main(
     config_path="../configs",
@@ -86,23 +66,20 @@ if output_dir is None:
 def main(
     cfg: DictConfig,
 ) -> None:
-    logger = init_logger(local_rank, output_dir)
-
-    hydra_config = hydra.core.hydra_config.HydraConfig.get()
-    config_name = hydra_config.job.config_name
-
     # NOTE: define callbacks for trainer
     cbs = [
         callbacks.RichProgressBar(),
         DebugCallback(),
     ]
 
+    cfg.data.train.loader_kwargs.num_workers = 2
+
     # NOTE: start training
     t = Trainer(
         accelerator="gpu",
         strategy="ddp_find_unused_parameters_true",
         # devices=[2, 3, 4, 5, 6, 7],  # NOTE: specify the devices to use
-        devices=[2, 3],
+        devices=[0, 1],
         callbacks=cbs,
         log_every_n_steps=cfg.log_interval,
         max_epochs=cfg.max_epochs,
@@ -166,9 +143,9 @@ class DebugCallback(callbacks.Callback):
         for name, param in pl_module.named_parameters():
             global_step = trainer.global_step
             if param.grad is None:
-                self.logger.info(f"Parameter {name} has gradient None")
+                logger.info(f"Parameter {name} has gradient None")
             else:
-                self.logger.info(
+                logger.info(
                     f"Parameter {name} has grad mean: {param.grad.mean()}, std: {param.grad.std()}"
                 )
         # if nan_flag and global_step >= 1000:
@@ -180,4 +157,24 @@ class DebugCallback(callbacks.Callback):
 
 
 if __name__ == "__main__":
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    filename = os.path.basename(__file__).split(".")[0]
+    cv2.setNumThreads(
+        0
+    )  # NOTE: set the number of threads to 0 to avoid cv2 become over head
+
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+    global_rank = int(os.environ.get("RANK", "0"))
+
+    # NOTE: get or initialize the output directory
+    output_dir = os.environ.get(
+        filename.upper() + "_OUTPUT_DIR",
+        None,
+    )
+    if output_dir is None:
+        print(f"Output directory not found in environment variables, initializing...")
+        output_dir = init_output_dir(filename)
+        os.environ[filename.upper() + "_OUTPUT_DIR"] = output_dir
+
+    logger = init_logger(local_rank, output_dir)
     main()

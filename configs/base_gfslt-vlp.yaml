@@ -2,8 +2,8 @@ defaults:
   - model: vlp
   - data: ph14t_*x224x224
   - engine: default
-  # - override hydra/hydra_logging: null
-  # - override hydra/job_logging: null
+  - override hydra/hydra_logging: none
+  - override hydra/job_logging: none
   - _self_
 
 hydra:
@@ -12,8 +12,5 @@ hydra:
   sweep:
     dir: .
   output_subdir: null
-  job_logging:
-    version: 1
-    disable_existing_loggers: false
-    root:
-      handlers: []
+  # job_logging: null
+  # hydra_logging: null

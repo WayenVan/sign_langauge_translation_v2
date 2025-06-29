@@ -54,23 +54,6 @@ def init_logger(local_rank, output_dir: str):
     return logging.getLogger(__name__)
 
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-filename = os.path.basename(__file__).split(".")[0]
-cv2.setNumThreads(0)  # NOTE: set the number of threads to 0 to avoid cv2 error
-
-local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-global_rank = int(os.environ.get("RANK", "0"))
-# NOTE: get or initialize the output directory
-output_dir = os.environ.get(
-    filename.upper() + "_OUTPUT_DIR",
-    None,
-)
-if output_dir is None:
-    print(f"Output directory not found in environment variables, initializing...")
-    output_dir = init_output_dir(filename)
-    os.environ[filename.upper() + "_OUTPUT_DIR"] = output_dir
-
-
 # NOTE: the hydra appp only inisitalize once
 @hydra.main(
     config_path="../configs",
@@ -203,4 +186,21 @@ class DebugCallback(callbacks.Callback):
 
 
 if __name__ == "__main__":
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    filename = os.path.basename(__file__).split(".")[0]
+    cv2.setNumThreads(0)  # NOTE: set the number of threads to 0 to avoid cv2 error
+
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+    global_rank = int(os.environ.get("RANK", "0"))
+
+    # NOTE: get or initialize the output directory
+    output_dir = os.environ.get(
+        filename.upper() + "_OUTPUT_DIR",
+        None,
+    )
+    if output_dir is None:
+        print(f"Output directory not found in environment variables, initializing...")
+        output_dir = init_output_dir(filename)
+        os.environ[filename.upper() + "_OUTPUT_DIR"] = output_dir
+
     main()
