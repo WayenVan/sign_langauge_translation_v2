@@ -57,7 +57,7 @@ def build_mlp(depth, hidden_size, output_hidden_size):
 MAX_TOKEN_LENGTH = 1024  # Maximum token length for MBart
 
 
-class MBartSLTModel(LightningModule):
+class MBartSLTModel(LightningModule, AutoModelForSeq2SeqLMWithValueHead):
     def __init__(self, cfg):
         super().__init__()
 
@@ -144,6 +144,36 @@ class MBartSLTModel(LightningModule):
             param.requires_grad = False
         for param in self.mbart.base_model.decoder.embed_positions.parameters():
             param.requires_grad = False
+
+    def generate(
+        self,
+        input_ids: Tensor,
+        attention_mask: Tensor | None = None,
+        **kwargs: Any,
+    ):
+        """
+        a dummy generate function to make the model compatible with the trl library.
+        input_ids is the concated video frames across batch,
+        attention_mask is the length of each video in the batch.
+        """
+        video = input_ids  # Assuming input_ids is the video tensor
+        video_length = attention_mask  # Assuming attention_mask is the video length
+
+        visual_encoder_out = self.visual_encoder_forward(video, video_length)
+
+        return self.mbart.generate(
+            encoder_outputs=BaseModelOutput(
+                last_hidden_state=visual_encoder_out.visual_feats,
+                # last_hidden_state=visual_global_feats.unsqueeze(1),  # [B, 1, D]
+                hidden_states=None,
+                attentions=None,
+            ),
+            attention_mask=visual_encoder_out.attention_mask,  # [B, T]
+            forced_bos_token_id=self.tokenizer.lang_code_to_id[self.lang],
+            # num_beams=4,
+            # max_new_tokens=150,
+            **kwargs,  # Pass any additional arguments to the generate method
+        )
 
     def get_eos_embedding(self):
         """
