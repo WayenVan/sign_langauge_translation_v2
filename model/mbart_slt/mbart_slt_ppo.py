@@ -7,7 +7,6 @@ import torch
 from torch import nn, Tensor
 from lightning import LightningModule
 import os
-from vector_quantize_pytorch import VectorQuantize
 
 from tensordict import TensorDict
 
@@ -35,14 +34,15 @@ from transformers.models.mbart.modeling_mbart import (
     shift_tokens_right,
 )
 from transformers.models.mbart.configuration_mbart import MBartConfig
-from transformers.modeling_outputs import BaseModelOutput
+from transformers.modeling_outputs import BaseModelOutput, Seq2SeqLMOutput
+from transformers.modeling_utils import PreTrainedModel, GenerationMixin
 from torchmetrics import Accuracy
 from torchmetrics.text import BLEUScore
 from typing import Any
 import copy
 from misc.tuple_output import TupleOutput
 
-from trl import AutoModelForSeq2SeqLMWithValueHead
+from trl.models.modeling_value_head import ValueHead
 # logger = logging.getLogger(__name__)
 
 
@@ -57,11 +57,14 @@ def build_mlp(depth, hidden_size, output_hidden_size):
 MAX_TOKEN_LENGTH = 1024  # Maximum token length for MBart
 
 
-class MBartSLTModel(LightningModule, AutoModelForSeq2SeqLMWithValueHead):
+class MBartSLTModel(PreTrainedModel, LightningModule):
     def __init__(self, cfg):
-        super().__init__()
+        self.mname = "facebook/mbart-large-50-many-to-many-mmt"
+        self.mbart_config = MBartConfig.from_pretrained(self.mname)
+        super().__init__(self.mbart_config)
 
         self.cfg: DictConfig = cfg
+
         self.lang = "de_DE"  # Set source language to German
         self._init_mbart_model()
 
@@ -93,6 +96,8 @@ class MBartSLTModel(LightningModule, AutoModelForSeq2SeqLMWithValueHead):
         # self.text_connector = build_mlp(
         #     self.cfg.modules.connector_depth, self.d_model, self.d_model
         # )
+        # set up the pretrained model parameters
+        self.is_peft_model = False
 
     def _init_visual_modules(self):
         self.visual_backbone = instantiate(self.cfg.model.backbone)
@@ -109,18 +114,16 @@ class MBartSLTModel(LightningModule, AutoModelForSeq2SeqLMWithValueHead):
         self.visual_backbone.eval()
 
     def _init_mbart_model(self):
-        mname = "facebook/mbart-large-50-many-to-many-mmt"
         self.mbart = MBartForConditionalGeneration.from_pretrained(
-            mname,
+            self.mname,
             torch_dtype=torch.bfloat16,  # Use bfloat16 for better performance on TPUs
         )
 
         self.tokenizer = MBart50TokenizerFast.from_pretrained(
-            mname,
+            self.mname,
         )
         self.tokenizer.src_lang = self.lang
 
-        self.mbart_config = MBartConfig.from_pretrained(mname)
         self.d_model = self.mbart_config.d_model
 
         self.eos_token = "</s>"
@@ -173,6 +176,28 @@ class MBartSLTModel(LightningModule, AutoModelForSeq2SeqLMWithValueHead):
             # num_beams=4,
             # max_new_tokens=150,
             **kwargs,  # Pass any additional arguments to the generate method
+        )
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        **kwargs,
+    ):
+        video = input_ids  # Assuming input_ids is the video tensor
+        video_length = attention_mask  # Assuming attention_mask is the video length
+
+        visual_encoder_out = self.visual_encoder_forward(video, video_length)
+
+        return self.mbart.forward(
+            encoder_outputs=BaseModelOutput(
+                last_hidden_state=visual_encoder_out.visual_feats,
+                # last_hidden_state=visual_global_feats.unsqueeze(1),  # [B, 1, D]
+                hidden_states=None,
+                attentions=None,
+            ),
+            attention_mask=visual_encoder_out.attention_mask,  # [B, T]
+            **kwargs,  # Pass any additional arguments to the decoder
         )
 
     def get_eos_embedding(self):
@@ -476,57 +501,6 @@ class MBartSLTModel(LightningModule, AutoModelForSeq2SeqLMWithValueHead):
             prog_bar=True,
             batch_size=B,
         )
-
-        # calculate the sign contrastive loss
-        # signcl = SignCL()
-        # signcl_loss = signcl(
-        #     visual_hidden_states[self.cfg.sign_cl_layer][:, 1:, :],  # [B, T-1, D]
-        # )
-        # self.log(
-        #     "train_signcl_loss",
-        #     signcl_loss,
-        #     on_step=True,
-        #     on_epoch=True,
-        #     prog_bar=True,
-        # )
-        #
-        # calculate the earth mover loss
-        # earth_mover_loss = (
-        #     masked_emd_batch(
-        #         visual_hidden_states[self.visual_encoder_cfg.num_layers // 2 - 1][
-        #             :, 1:, :
-        #         ],  # [B, T-1, D]
-        #         text_feats[:, 1:, :],  # [B, L, D]
-        #         visual_attn_mask[:, 1:],  # [B, T-1]
-        #         attention_mask[:, 1:],  # [B, L]
-        #         blur=self.cfg.earth_mover_blur,
-        #     )
-        #     * self.cfg.earth_mover_loss_weight
-        # )
-        # self.log(
-        #     "train_earth_mover_loss",
-        #     earth_mover_loss,
-        #     on_step=True,
-        #     on_epoch=True,
-        #     prog_bar=True,
-        # )
-
-        # fine_grain_loss = (
-        #     self.contrastive_loss(
-        #         visual_last_hidden_states[:, 1:, :],  # [B, T-1, D]
-        #         visual_attn_mask[:, 1:],  # [B, T-1]
-        #         text_feats[:, 1:],  # [B, L, D]
-        #         attention_mask[:, 1:],  # [B, L]
-        #     )
-        #     * self.cfg.fine_grain_loss_weight
-        # )
-        # self.log(
-        #     "train_fine_grain_loss",
-        #     fine_grain_loss,
-        #     on_step=True,
-        #     on_epoch=True,
-        #     prog_bar=True,
-        # )
 
         # Update accuracy
         self.train_accu_visual.update(

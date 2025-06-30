@@ -15,6 +15,7 @@ class Ph14TGeneralDataset(Dataset):
             os.path.join(os.path.dirname(__file__), "ph14t_builder.py"),
             data_dir=data_root,
             split=mode,
+            trust_remote_code=True,
         )
         self.df = self.hg_dataset.to_polars()
         self.mode = mode

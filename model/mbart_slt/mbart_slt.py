@@ -7,7 +7,6 @@ import torch
 from torch import nn, Tensor
 from lightning import LightningModule
 import os
-from vector_quantize_pytorch import VectorQuantize
 
 from tensordict import TensorDict
 
@@ -93,6 +92,8 @@ class MBartSLTModel(LightningModule):
         # self.text_connector = build_mlp(
         #     self.cfg.modules.connector_depth, self.d_model, self.d_model
         # )
+        #
+        # NOTE: some parameters which compatible with the original mbart model
 
     def _init_visual_modules(self):
         self.visual_backbone = instantiate(self.cfg.model.backbone)
