@@ -12,7 +12,7 @@ visual_adapter:
   target_hidden_size: 1024
   num_heads: 12
   num_layers: 1
-  num_extra_queries: 8
+  num_extra_queries: 32
   mlp_depth: 2
   attn_drop: 0.0
   proj_drop: 0.0
