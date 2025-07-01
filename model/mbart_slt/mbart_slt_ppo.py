@@ -35,7 +35,10 @@ from transformers.models.mbart.modeling_mbart import (
 )
 from transformers.models.mbart.configuration_mbart import MBartConfig
 from transformers.modeling_outputs import BaseModelOutput, Seq2SeqLMOutput
-from transformers.modeling_utils import PreTrainedModel, GenerationMixin
+from transformers.modeling_utils import PreTrainedModel
+
+
+from transformers.generation.utils import GenerationMixin
 from torchmetrics import Accuracy
 from torchmetrics.text import BLEUScore
 from typing import Any
@@ -57,7 +60,7 @@ def build_mlp(depth, hidden_size, output_hidden_size):
 MAX_TOKEN_LENGTH = 1024  # Maximum token length for MBart
 
 
-class MBartSLTModel(PreTrainedModel, LightningModule):
+class MBartSLTModel(PreTrainedModel, GenerationMixin, LightningModule):
     def __init__(self, cfg):
         self.mname = "facebook/mbart-large-50-many-to-many-mmt"
         self.mbart_config = MBartConfig.from_pretrained(self.mname)

@@ -21,20 +21,14 @@ import torch
 
 # from model.slt_vision_pretrain import SignBackboneForVPretraining
 # from model.t5_text_pretrain import ModelForT5TextPretrain
-from model.mbart_slt import MBartSLTModel
+from model.mbart_slt.mbart_slt import MBartSLTModel
 import cv2
 
 import datetime
 
 from misc.git_utils import save_git_info
 from typing import Any, Dict
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-filename = os.path.basename(__file__).split(".")[0]
-cv2.setNumThreads(0)  # NOTE: set the number of threads to 0 to avoid cv2 error
-
-local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-global_rank = int(os.environ.get("RANK", "0"))
+from data.datamodule import DataModule
 
 
 def init_output_dir(file_name: str) -> str:
@@ -62,26 +56,10 @@ def init_logger(local_rank, output_dir: str):
     )
 
 
-# NOTE: get or initialize the output directory
-output_dir = os.environ.get(
-    filename.upper() + "_OUTPUT_DIR",
-    None,
-)
-if output_dir is None:
-    print(f"Output directory not found in environment variables, initializing...")
-    output_dir = init_output_dir(filename)
-    os.environ[filename.upper() + "_OUTPUT_DIR"] = output_dir
-
-# NOTE: initialize the logger
-init_logger(local_rank, output_dir)
-logger = logging.getLogger(__name__)
-logger.info(f"Output directory: {output_dir}")
-
-
 def main(
-    cfg: str = "outputs/slt_mbart_8a100/2025-06-22_16-48-04/config.yaml",
-    ckpt: str = "outputs/slt_mbart_8a100/2025-06-22_16-48-04/epoch=118-val_generate_bleu=0.3410-gajekce6.ckpt",
-    devices: list[int] = [0, 1],
+    cfg: str = "outputs/train_mbart_slt/2025-06-29_03-06-00/config.yaml",
+    ckpt: str = "outputs/train_mbart_slt/2025-06-29_03-06-00/epoch=177-val_generate_bleu=0.3647-5o9uy313.ckpt",
+    devices: list[int] = [2, 3],
     precision: str = "bf16-mixed",
 ) -> None:
     cfg = OmegaConf.load(cfg)
@@ -98,11 +76,6 @@ def main(
         strategy="ddp_find_unused_parameters_true",
         devices=devices,
         callbacks=cbs,
-        # log_every_n_steps=cfg.log_interval,
-        # max_epochs=cfg.max_epochs,
-        # gradient_clip_val=1.0,  # NOTE: gradient clipping will be normed
-        # gradient_clip_algorithm="value",
-        # sync_batchnorm=True,
         precision=precision,
         # WARN: will slow down the training process, just for debug now
         # detect_anomaly=True,
@@ -110,9 +83,21 @@ def main(
 
     logger.info(f"Process in local rank {t.local_rank}, global rank {t.global_rank}")
 
-    datamodule = instantiate(cfg.data.datamodule, cfg)
-    model = MBartSLTModel.load_from_checkpoint(ckpt, cfg=cfg, map_location="cpu")
-    t.validate(model, datamodule=datamodule)
+    model = MBartSLTModel.load_from_checkpoint(ckpt, cfg=cfg, map_location="cuda:2")
+
+    datamodule = DataModule(cfg.data, model.tokenizer)
+    datamodule.setup()
+
+    for batch in datamodule.val_dataloader():
+        video_input, text_src_input, masked_text_src_input = model.dispatch_batch(batch)
+
+        with torch.autocast(
+            device_type="cuda",
+            dtype=torch.bfloat16,
+        ):
+            print(model.generate(video_input["video"], video_input["video_length"]))
+
+    # t.validate(model, datamodule=datamodule)
 
 
 class DebugCallback(callbacks.Callback):
@@ -174,4 +159,25 @@ class DebugCallback(callbacks.Callback):
 
 
 if __name__ == "__main__":
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    filename = os.path.basename(__file__).split(".")[0]
+    cv2.setNumThreads(0)  # NOTE: set the number of threads to 0 to avoid cv2 error
+
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+    global_rank = int(os.environ.get("RANK", "0"))
+    # NOTE: get or initialize the output directory
+    output_dir = os.environ.get(
+        filename.upper() + "_OUTPUT_DIR",
+        None,
+    )
+    if output_dir is None:
+        print(f"Output directory not found in environment variables, initializing...")
+        output_dir = init_output_dir(filename)
+        os.environ[filename.upper() + "_OUTPUT_DIR"] = output_dir
+
+    # NOTE: initialize the logger
+    init_logger(local_rank, output_dir)
+    logger = logging.getLogger(__name__)
+    logger.info(f"Output directory: {output_dir}")
+
     typer.run(main)  # type: ignore

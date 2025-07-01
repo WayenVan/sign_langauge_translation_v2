@@ -9,11 +9,13 @@ from data.datamodule import DataModule
 import torch
 
 if __name__ == "__main__":
+    device = "cuda:2"
     initialize(config_path="../configs")
     cfg = compose("gfslt-vlp_pretrain_8a100")
 
     model = AutoModelForSeq2SeqLMWithValueHead(MBartSLTModel(cfg))
     model.is_peft_model = False
+    model = model.to(device)
 
     for name, param in model.named_parameters():
         print(name)
@@ -25,15 +27,15 @@ if __name__ == "__main__":
     data_module.setup()
     for i, batch in enumerate(data_module.train_dataloader()):
         video_input, text_src, _ = batch
-        with torch.autocast("cpu", dtype=torch.bfloat16):
+        with torch.autocast("cuda", dtype=torch.bfloat16):
             model(
-                input_ids=video_input["video"],
-                attention_mask=video_input["video_length"],
-                labels=text_src["input_ids"],
+                input_ids=video_input["video"].to(device),
+                attention_mask=video_input["video_length"].to(device),
+                labels=text_src["input_ids"].to(device),
             )
             model.generate(
-                input_ids=video_input["video"],
-                attention_mask=video_input["video_length"],
+                input_ids=video_input["video"].to(device),
+                attention_mask=video_input["video_length"].to(device),
                 max_new_tokens=20,
             )
             print("ok")

@@ -562,6 +562,33 @@ class MBartSLTModel(LightningModule):
 
         return output
 
+    def generate(
+        self,
+        video: Tensor,  # [B, T, C, H, W]
+        video_length: Tensor,  # [B]
+        lang=None,  # Language code for the target language
+    ) -> List[str]:
+        visual_encoder_out = self.visual_encoder_forward(video, video_length)
+
+        output = self.mbart.generate(
+            encoder_outputs=BaseModelOutput(
+                last_hidden_state=visual_encoder_out.visual_feats,
+                # last_hidden_state=visual_global_feats.unsqueeze(1),  # [B, 1, D]
+                hidden_states=None,
+                attentions=None,
+            ),
+            attention_mask=visual_encoder_out.attention_mask,  # [B, T]
+            forced_bos_token_id=self.tokenizer.lang_code_to_id[self.lang]
+            if lang is None
+            else self.tokenizer.lang_code_to_id[lang],
+            num_beams=4,
+            max_new_tokens=150,
+        )
+
+        decoded_output = self.tokenizer.batch_decode(output, skip_special_tokens=True)
+
+        return decoded_output
+
     @staticmethod
     def contrastive_loss(
         visual_features: Tensor,  # [B, T, D]
