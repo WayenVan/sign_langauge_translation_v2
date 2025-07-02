@@ -43,8 +43,8 @@ def test_slt_model():
     loader = data_module.train_dataloader()
     for i, batch in enumerate(loader):
         with torch.autocast("cuda", dtype=torch.bfloat16):
-            # model.training_step(batch, 0)
-            model.validation_step(batch, 0)
+            model.training_step(batch, 0)
+            # model.validation_step(batch, 0)
             print("ok")
 
 

@@ -214,7 +214,7 @@ class STCConnector(nn.Module):
             )
         else:
             self.s2 = nn.Identity()
-        self.readout = build_mlp(mlp_depth, hidden_size, output_hidden_size)
+        self.readout = build_mlp(mlp_depth, hidden_size, hidden_size)
 
     def forward(self, x):
         """Aggregate tokens on the temporal and spatial dimensions.
@@ -240,7 +240,9 @@ class STCConnector(nn.Module):
         # 3. the second stage of the adapter
         x = einops.rearrange(x, "b d t h w -> (b t) d h w")
         x = self.s2(x)
-        x = einops.rearrange(x, "(b t) d h w -> b (t h w) d", t=new_t)
+        # x = einops.rearrange(x, "(b t) d h w -> b (t h w) d", t=new_t)
+        x = einops.rearrange(x, "(b t) d h w -> b t h w d", t=new_t)
+        x = einops.reduce(x, "b t h w d -> b t d", "max")
         x = self.readout(x)
         return x
 
