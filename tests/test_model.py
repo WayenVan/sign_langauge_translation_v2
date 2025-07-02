@@ -32,19 +32,22 @@ def test_slt_model():
     cfg = compose("gfslt-vlp_pretrain_8a100")
     cfg.data.train.loader_kwargs.batch_size = 2
     cfg.data.train.loader_kwargs.num_workers = 1
+    cfg.data.val.loader_kwargs.batch_size = 2
+    cfg.data.val.loader_kwargs.num_workers = 1
 
-    model = instantiate(cfg.model.type, cfg).to("cuda:2")
+    model = instantiate(cfg.model.type, cfg).to("cuda:3")
     for name, param in model.named_parameters():
         print(name)
 
     data_module = DataModule(cfg.data, model.tokenizer)
     data_module.setup()
 
-    loader = data_module.train_dataloader()
+    # loader = data_module.train_dataloader()
+    loader = data_module.val_dataloader()
     for i, batch in enumerate(loader):
         with torch.autocast("cuda", dtype=torch.bfloat16):
-            model.training_step(batch, 0)
-            # model.validation_step(batch, 0)
+            # model.training_step(batch, 0)
+            model.validation_step(batch, 0)
             print("ok")
 
 

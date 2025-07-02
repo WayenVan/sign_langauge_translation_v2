@@ -84,10 +84,14 @@ def test_datamodule():
 
     datamodule = DataModule(cfg.data, tokenizer=tokenizer)
     datamodule.setup("fit")
-    train_dataloader = datamodule.train_dataloader()
-    # train_dataloader = datamodule.val_dataloader()
+    # train_dataloader = datamodule.train_dataloader()
+    train_dataloader = datamodule.val_dataloader()
     for batch in tqdm(train_dataloader):
-        print(batch)
+        # print(batch)
+        # print(batch["prompts"][0])
+        print(batch["text_input"][0])
+        print(batch["text_input_ids"][0])
+        print(batch["text_label_mask"][0])
         # print(batch["translation"])
         pass
 

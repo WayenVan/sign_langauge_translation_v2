@@ -11,6 +11,7 @@ train:
     width: 224
   collator:
     _target_: data.collators.Gemma3SLTCollator
+    mode: train
   loader_kwargs:
     batch_size: 8
     shuffle: false
@@ -30,6 +31,7 @@ val:
     width: 224
   collator:
     _target_: data.collators.Gemma3SLTCollator
+    mode: val
   loader_kwargs:
     batch_size: 2
     shuffle: false

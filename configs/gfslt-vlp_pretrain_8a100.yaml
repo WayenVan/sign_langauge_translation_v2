@@ -2,7 +2,8 @@ defaults:
   - base_gfslt-vlp
   # - override modules: dinov2_base
   # - override model: mbart_slt
-  - override model: mbart_slt_stc
+  # - override model: mbart_slt_stc
+  - override model: gemma_slt
   # - override data: ph14t_*x224x224_gfslt
   # - override data: ph14t_*x224x224_mbart
   - override data: ph14t_*x224x224_gemmaslt

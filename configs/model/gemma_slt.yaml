@@ -1,0 +1,29 @@
+type:
+  _target_: model.gemma_slt.Gemma3SLT
+
+backbone:
+  _target_: model.gemma_slt.DinoV2Backbone
+  id: facebook/dinov2-with-registers-base
+  output_layer: -2
+
+visual_adapter:
+  _target_: model.gemma_slt.TokenSampleAdapter
+  hidden_size: 768
+  target_hidden_size: 2560
+  num_heads: 12
+  num_layers: 1
+  num_extra_queries: 4
+  mlp_depth: 2
+  attn_drop: 0.0
+  proj_drop: 0.0
+
+visual_encoder_layer_scale: 1
+# connector_depth: 1
+#
+lora_config:
+  r: 16
+  lora_alpha: 16
+  lora_dropout: 0.1
+  bias: none
+
+chat_template: jinjas/gemma_slt.jinja

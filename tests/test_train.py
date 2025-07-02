@@ -79,7 +79,7 @@ def main(
         accelerator="gpu",
         strategy="ddp_find_unused_parameters_true",
         # devices=[2, 3, 4, 5, 6, 7],  # NOTE: specify the devices to use
-        devices=[2, 3],
+        devices=[6, 7],
         callbacks=cbs,
         log_every_n_steps=cfg.log_interval,
         max_epochs=cfg.max_epochs,

@@ -78,8 +78,6 @@ class Gemma3SLT(LightningModule):
         self.bleu = BLEUScore(n_gram=1, smooth=True)
         self.blue4 = BLEUScore(n_gram=4, smooth=True)
 
-        self._post_init()
-
         # self.connector = build_mlp(
         #     self.cfg.modules.connector_depth, self.d_model, self.d_model
         # )
@@ -88,18 +86,6 @@ class Gemma3SLT(LightningModule):
         # )
         #
         # NOTE: some parameters which compatible with the original mbart model
-
-    @torch.no_grad()
-    def _post_init(self):
-        # initialize the start and end video embeddings with the mean of the input embeddings
-        embed_mean = self.gemma.get_input_embeddings().weight.data.mean(
-            dim=0, keepdim=True
-        )
-        self.start_video_embds.data.copy_(embed_mean)
-        self.end_video_embeds.data.copy_(embed_mean)
-
-        # initalize the visual position embedding
-        torch.nn.init.trunc_normal_(self.visual_position_embedding.weight, std=0.02)
 
     def _init_visual_modules(self):
         self.visual_backbone = instantiate(self.cfg.model.backbone)

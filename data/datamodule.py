@@ -52,7 +52,7 @@ class DataModule(LightningDataModule):
         # Return the validation dataloader
         return DataLoader(
             self.val_dataset,
-            collate_fn=instantiate(self.cfg.train.collator, tokenizer=self.tokenizer),
+            collate_fn=instantiate(self.cfg.val.collator, tokenizer=self.tokenizer),
             **self.cfg.val.loader_kwargs,
         )
 
