@@ -21,8 +21,8 @@ visual_encoder_layer_scale: 1
 # connector_depth: 1
 #
 lora_config:
-  r: 16
-  lora_alpha: 16
+  r: 64
+  lora_alpha: 64
   lora_dropout: 0.1
   bias: none
 

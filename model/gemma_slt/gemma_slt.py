@@ -16,7 +16,7 @@ from omegaconf import OmegaConf, DictConfig
 from hydra.utils import instantiate
 
 from typing import List
-from transformers import get_scheduler
+from transformers import Gemma3ForConditionalGeneration, get_scheduler
 from torch import optim
 from torch.optim import lr_scheduler as scheduler
 from timm.optim import create_optimizer_v2
@@ -86,6 +86,16 @@ class Gemma3SLT(LightningModule):
         # )
         #
         # NOTE: some parameters which compatible with the original mbart model
+        self._post_init()
+
+    @torch.no_grad()
+    def _post_init(self):
+        mean = self.gemma.get_input_embeddings().weight.data.mean(dim=0, keepdim=True)
+        self.start_video_embds.copy_(mean)
+        self.end_video_embeds.copy_(mean)
+
+        # init the visual position embedding
+        torch.nn.init.trunc_normal_(self.visual_position_embedding.weight, std=0.02)
 
     def _init_visual_modules(self):
         self.visual_backbone = instantiate(self.cfg.model.backbone)
@@ -98,7 +108,7 @@ class Gemma3SLT(LightningModule):
     def _init_gemma_model(self):
         mname = "google/gemma-3-4b-it"
 
-        gemma = Gemma3ForCausalLM.from_pretrained(
+        gemma = Gemma3ForConditionalGeneration.from_pretrained(
             mname,
             torch_dtype=torch.bfloat16,  # Use bfloat16 for better performance on TPUs
         )
@@ -190,7 +200,6 @@ class Gemma3SLT(LightningModule):
         gemma_output = self.gemma.forward(
             attention_mask=input.attention_mask,  # [B, L]
             inputs_embeds=input.inputs_embeds,  # [B, L, D]
-            labels=labels,  # [B, L]
         )
         return TupleOutput(
             gemma_output=gemma_output,  # Gemma3ForCausalLMOutput
@@ -214,13 +223,12 @@ class Gemma3SLT(LightningModule):
             text_label_mask=None,
         )
 
-        output = self.gemma.generate(
+        return self.gemma.generate(
             inputs_embeds=input.inputs_embeds,  # [B, L, D]
             attention_mask=input.attention_mask,  # [B, L]
             num_beams=4,
             max_new_tokens=150,
         )
-        return output
 
     def prepare_for_casual_lm(
         self,
@@ -413,14 +421,18 @@ class Gemma3SLT(LightningModule):
             text_attention_mask=batch["text_attention_mask"],  # [B, L]
             text_label_mask=batch["text_label_mask"],  # [B, L] or None
         )
-        loss = output.gemma_output.loss  # Gemma3ForCausalLMOutput
+
         logits = output.gemma_output.logits  # [B, L, V]
         labels = output.labels  # [B, L]
 
+        loss = F.cross_entropy(
+            logits.view(-1, logits.shape[-1]),  # [B*L, V]
+            labels.view(-1),  # [B*L]
+            ignore_index=-100,  # ignore the padding tokens
+        )
+
         self.train_accu_visual.update(
-            logits[:, : self.gemma_config.vocab_size].view(
-                -1, logits.shape[-1]
-            ),  # [B*L, V]
+            logits.view(-1, logits.shape[-1]),  # [B*L, V]
             labels.view(-1),  # [B*L]
         )
 
