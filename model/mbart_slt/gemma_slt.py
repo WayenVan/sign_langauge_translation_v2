@@ -52,13 +52,7 @@ def build_mlp(depth, hidden_size, output_hidden_size):
     return nn.Sequential(*modules)
 
 
-class Language(Enum):
-    DE = "German"
-    EN = "English"
-    ZH = "Chinese"
-
-
-class MBartSLTModel(LightningModule):
+class Gemma3SLT(LightningModule):
     MAX_TOKEN_LENGTH = 1024  # Maximum token length for MBart
 
     def __init__(self, cfg):

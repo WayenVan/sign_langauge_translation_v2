@@ -34,42 +34,6 @@ def test_dataset():
         print(data["video"].shape)
 
 
-def test_datamodule():
-    initialize(config_path="../configs")
-    cfg = compose("gfslt-vlp_pretrain_8a100")
-
-    cfg.data.train.loader_kwargs.num_workers = 1
-    # cfg.data.train.loader_kwargs.prefetch_factor = None
-    cfg.data.val.loader_kwargs.num_workers = 1
-    cfg.data.train.loader_kwargs.batch_size = 2
-
-    # tokenizer = AutoTokenizer.from_pretrained(
-    #     "facebook/mbart-large-cc25",
-    #     # use_fast=False,
-    #     src_lang="de_DE",
-    #     tgt_lang="de_DE",
-    # )
-    tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/mbart-large-50-many-to-many-mmt",
-        # use_fast=False,
-    )
-    tokenizer.src_lang = "de_DE"
-    tokenizer.tgt_lang = "de_DE"
-
-    datamodule = DataModule(cfg.data, tokenizer=tokenizer)
-    datamodule.setup("fit")
-    train_dataloader = datamodule.train_dataloader()
-    # train_dataloader = datamodule.val_dataloader()
-    for batch in tqdm(train_dataloader):
-        print(batch)
-
-
-from hydra import compose, initialize
-from hydra.utils import instantiate
-from transformers import AutoTokenizer
-from data.datamodule import DataModule
-
-
 def test_max_data_length():
     tokenizer = AutoTokenizer.from_pretrained("dbmdz/bert-base-german-europeana-cased")
     data_root = "/root/shared-data/sign_language_translation_llm/dataset/PHOENIX-2014-T-release-v3/"
@@ -111,10 +75,12 @@ def test_datamodule():
     #     tgt_lang="de_DE",
     # )
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/mbart-large-50-many-to-many-mmt",
+        "google/gemma-3-4b-it",
         # use_fast=False,
     )
-    tokenizer.src_lang = "de_DE"
+    with open("jinjas/gemma_slt.jinja", "r") as f:
+        template = f.read()
+    tokenizer.chat_template = template
 
     datamodule = DataModule(cfg.data, tokenizer=tokenizer)
     datamodule.setup("fit")
