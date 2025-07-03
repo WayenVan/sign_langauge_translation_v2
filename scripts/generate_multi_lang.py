@@ -19,18 +19,20 @@ import os
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 os.environ["VLLM_USE_V1"] = "0"  # Use v1 API for vLLM
-os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+
+lang = "Chinese"
 mname = "google/gemma-3-27b-it"
 # mname = "sartifyllc/pawa-min-alpha"
-working_dir = "outputs/ph14t_multiling"
+working_dir = f"outputs/ph14t_{lang.lower()}"
 output_dir = working_dir
 lang = "zh"
 data_root = "dataset/PHOENIX-2014-T-release-v3"
 
 system = {
     "role": "system",
-    "content": """You are a professional translator model that translates German to Chinese.
-You should only show translation, do not genearte any function calls or tool calls. Do not add any additional prefixes or suffixes to the translation. The output should only inlucde Chinese. You should keep the details of the original query as much as possible, and do not change the meaning of the query.""",
+    "content": f"""You are a professional translator model that translates German to {lang}.
+You should only show translation, do not genearte any function calls or tool calls. Do not add any additional prefixes or suffixes to the translation. The output should only inlucde {lang}. You should keep the details of the original query as much as possible, and do not change the meaning of the query.""",
 }
 
 
@@ -61,7 +63,7 @@ def do_translate(originals: list[str]):
             system,
             {
                 "role": "user",
-                "content": "translate this to Chinese and only show the Chinese translation:  \n"
+                "content": f"translate this to {lang} and only show the {lang} translation:  \n"
                 + q
                 + " /no_think \n",
             },
