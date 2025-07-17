@@ -3,7 +3,8 @@ defaults:
   # - override modules: dinov2_base
   # - override model: mbart_slt
   # - override model: mbart_slt_stc
-  - override model: gemma_slt
+  # - override model: gemma_slt
+  - override model: gemma_slt_dino_lora
   # - override data: ph14t_*x224x224_gfslt
   # - override data: ph14t_*x224x224_mbart
   - override data: ph14t_*x224x224_gemmaslt

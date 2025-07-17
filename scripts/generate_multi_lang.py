@@ -19,14 +19,14 @@ import os
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 os.environ["VLLM_USE_V1"] = "0"  # Use v1 API for vLLM
-os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
-lang = "Chinese"
+lang = "Chinese"  # Change this to the desired language
 mname = "google/gemma-3-27b-it"
 # mname = "sartifyllc/pawa-min-alpha"
 working_dir = f"outputs/ph14t_{lang.lower()}"
 output_dir = working_dir
-lang = "zh"
+# lang = "zh"
 data_root = "dataset/PHOENIX-2014-T-release-v3"
 
 system = {
@@ -65,7 +65,7 @@ def do_translate(originals: list[str]):
                 "role": "user",
                 "content": f"translate this to {lang} and only show the {lang} translation:  \n"
                 + q
-                + " /no_think \n",
+                + "\n",
             },
         ]
         prompts.append(
@@ -105,4 +105,4 @@ for subset in ["train", "dev", "test"]:
             name = row["name"]
             original = row["translation"]
             translated = do_translate([original])
-            f.write(f"{name}|{translated[0].outputs[0].text}\n")
+            f.write(f"{name}|{translated[0].outputs[0].text.strip()}\n")

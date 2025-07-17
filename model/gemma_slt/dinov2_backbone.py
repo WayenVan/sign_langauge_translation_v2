@@ -16,31 +16,32 @@ logger = logging.getLogger(__name__)
 
 
 class DinoV2Backbone(nn.Module):
-    def __init__(self, id, output_layer=-1, start_lora_layer=None, **lora_kwargs):
+    def __init__(self, id, output_layer=-1, **lora_kwargs):
         super().__init__()
         self.id = id
-        if start_lora_layer is None:
+        if lora_kwargs is None:
             self.visual_encoder = Dinov2WithRegistersModel.from_pretrained(id)
+            self.is_lora = False
         else:
-            self.start_lora_layer = start_lora_layer
             self._init_lora_model(lora_kwargs)
+            self.is_lora = True
 
         self.output_layer = output_layer
 
     def _init_lora_model(self, lora_kwargs):
         visual_encoder = Dinov2WithRegistersModel.from_pretrained(self.id)
-        target_modules = []
-        # backbone.encoder.layer.1.attention.attention.query Linear
-        for name, module in visual_encoder.named_modules():
-            match = re.match(r"encoder\.layer\.([0-9]+)", name)
-            if match and int(match.group(1)) >= self.start_lora_layer:
-                if isinstance(module, torch.nn.Linear):
-                    target_modules.append(name)
-
         lora_config = LoraConfig(
             bias="none",
             # task_type=TaskType.IMAGE_CLASSIFICATION,
-            target_modules=target_modules,
+            target_modules=[
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",  # 全注意力投影
+                "gate_proj",
+                "up_proj",
+                "down_proj",  # GPT-style FFN 层
+            ],
             # lora_alpha=self.lora_alpha,
             # lora_dropout=self.lora_dropout,
             # r=self.lora_rank,
@@ -52,8 +53,9 @@ class DinoV2Backbone(nn.Module):
             lora_config,
         )
         trainable, all = self.visual_encoder.get_nb_trainable_parameters()
+
         logger.info(
-            f"Created Lora dino for {self.id} Trainable parameters: {trainable}, All parameters: {all}, Ratio: {trainable / all:.2%}"
+            f"Created Lora DinoV2 for {self.id} Trainable parameters: {trainable}, All parameters: {all}, Ratio: {trainable / all:.2%}"
         )
 
     def forward(self, x):

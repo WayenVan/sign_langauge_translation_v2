@@ -60,6 +60,8 @@ class Gemma3SLT(LightningModule):
         super().__init__()
 
         self.cfg: DictConfig = cfg
+        self.random_video_mask = cfg.model.random_video_mask
+
         self.lora_config = cfg.model.lora_config
 
         self._init_gemma_model()
@@ -101,9 +103,12 @@ class Gemma3SLT(LightningModule):
         self.visual_backbone = instantiate(self.cfg.model.backbone)
         self.visual_adapter = instantiate(self.cfg.model.visual_adapter)
 
-        for param in self.visual_backbone.parameters():
-            param.requires_grad = False
-        self.visual_backbone.eval()
+        if self.visual_backbone.is_lora:
+            return  # lora model, no need to freeze the backbone
+        else:
+            for param in self.visual_backbone.parameters():
+                param.requires_grad = False
+            self.visual_backbone.eval()
 
     def _init_gemma_model(self):
         mname = "google/gemma-3-4b-it"
@@ -164,7 +169,8 @@ class Gemma3SLT(LightningModule):
         # for param in self.mbart.base_model.encoder.embed_positions.parameters():
         #     param.requires_grad = False
         # for param in self.mbart.base_model.decoder.embed_positions.parameters():
-        #     param.requires_grad = False
+        #     param.requires_grad = Falsec
+        self.gemma.disable_adapter()
 
     def forward(
         self,
@@ -331,6 +337,15 @@ class Gemma3SLT(LightningModule):
             text_embedding * (1 - video_mask.unsqueeze(-1)).float()
             + extened_visual_feats
         )
+
+        if self.training and self.random_video_mask > 0.0:
+            random_temporal_mask = torch.ones_like(
+                attention_mask, device=self.device, dtype=torch.float32
+            ) * (1.0 - self.random_video_mask)
+            random_temporal_mask = random_temporal_mask.bernoulli()
+            random_temporal_mask = random_temporal_mask.bool() | ~video_mask.bool()
+
+            attention_mask = attention_mask * random_temporal_mask.long()
 
         return TupleOutput(
             input_ids=input_ids,  # [B, L]
