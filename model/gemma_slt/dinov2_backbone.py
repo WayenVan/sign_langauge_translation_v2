@@ -30,17 +30,14 @@ class DinoV2Backbone(nn.Module):
 
     def _init_lora_model(self, lora_kwargs):
         visual_encoder = Dinov2WithRegistersModel.from_pretrained(self.id)
+        # for name, p in visual_encoder.named_parameters():
+        #     print(name)
         lora_config = LoraConfig(
-            bias="none",
             # task_type=TaskType.IMAGE_CLASSIFICATION,
             target_modules=[
-                "q_proj",
-                "k_proj",
-                "v_proj",
-                "o_proj",  # 全注意力投影
-                "gate_proj",
-                "up_proj",
-                "down_proj",  # GPT-style FFN 层
+                "query",
+                "key",
+                "value",
             ],
             # lora_alpha=self.lora_alpha,
             # lora_dropout=self.lora_dropout,

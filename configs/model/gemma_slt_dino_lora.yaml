@@ -6,8 +6,8 @@ backbone:
   id: facebook/dinov2-with-registers-base
   output_layer: -2
   # lora configs for dinov2
-  r: 64
-  lora_alpha: 64
+  r: 4
+  lora_alpha: 4
   lora_dropout: 0.1
   bias: none
 
@@ -32,4 +32,4 @@ lora_config:
   bias: none
 
 chat_template: jinjas/gemma_slt.jinja
-random_video_mask: 0.9
+random_video_mask: 0.0

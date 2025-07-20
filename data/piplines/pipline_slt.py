@@ -12,7 +12,7 @@ from ..transforms import JitteredUniformSampleVideo, UniformSampleVideo, ToTenso
 
 
 class SLTGeneralPiplineTrain:
-    def __init__(self, height=224, width=224):
+    def __init__(self, height=224, width=224, downsample_rate=1):
         # video transforms
         self.resize_cop = Compose(
             [
@@ -38,6 +38,7 @@ class SLTGeneralPiplineTrain:
         # text transforms
         self.delete = RandomWordAug(action="delete", aug_p=0.5)
         # self.insert = RandomWordAug(action="insert", aug_p=0.5)
+        self.downsample_rate = downsample_rate
 
     def __call__(self, data):
         video = data["video"]
@@ -45,6 +46,7 @@ class SLTGeneralPiplineTrain:
 
         video = self.resize_cop(images=video)["images"]
         video = self.warp(images=video)["images"]
+        video = video[:: self.downsample_rate]  # downsample video
         video = ToTensorVideo()(video)
 
         text = self.delete.augment(text)[0]
@@ -57,8 +59,9 @@ class SLTGeneralPiplineTrain:
 
 
 class SLTGeneralPiplineTest:
-    def __init__(self, height=224, width=224, jittered_sample=True):
+    def __init__(self, height=224, width=224, downsample_rate=1):
         # video transforms
+        self.downsample_rate = downsample_rate
         self.resize_cop = Compose(
             [
                 Resize(height=256, width=256, p=1.0),
@@ -86,6 +89,7 @@ class SLTGeneralPiplineTest:
 
         video = self.resize_cop(images=video)["images"]
         video = self.warp(images=video)["images"]
+        video = video[:: self.downsample_rate]
         video = self.to_tensor(video)
 
         data["augmented_video"] = video

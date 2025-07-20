@@ -9,13 +9,14 @@ from timm.models.vision_transformer import (
     Mlp,
     LayerScale,
 )
+from transformers.models.gemma3.modeling_gemma3 import Gemma3RMSNorm
 
 
 def build_mlp(depth, hidden_size, output_hidden_size):
-    modules = [nn.Linear(hidden_size, output_hidden_size)]
+    modules = [nn.Linear(hidden_size, output_hidden_size, bias=False)]
     for _ in range(1, depth):
         modules.append(nn.GELU())
-        modules.append(nn.Linear(output_hidden_size, output_hidden_size))
+        modules.append(nn.Linear(output_hidden_size, output_hidden_size, bias=False))
     return nn.Sequential(*modules)
 
 
@@ -33,6 +34,7 @@ class TokenSampleAdapter(nn.Module):
         attn_drop=0.0,
         drop_path=0.0,
         max_length=512,
+        eps=1e-6,
     ):
         super().__init__()
         self.num_extra_queries = num_extra_queries
@@ -58,6 +60,7 @@ class TokenSampleAdapter(nn.Module):
         self.mlp = build_mlp(
             mlp_depth, hidden_size * self.num_extra_queries, target_hidden_size
         )
+        self.norm = Gemma3RMSNorm(hidden_size, eps=eps)
         # self.positional_embedding = nn.Embedding(max_length, target_hidden_size)
 
     def forward(self, x, v_length):
@@ -69,16 +72,13 @@ class TokenSampleAdapter(nn.Module):
         for block in self.blocks:
             extra_queries = block(extra_queries, x)
 
+        extra_queries = self.norm(
+            extra_queries
+        )  # (B*T, num_extra_queries, hidden_size)
+
         extra_queries = rearrange(
             extra_queries, "(b t) n c -> b t (n c)", b=B, t=T
         )  # (B, T, num_extra_queries * hidden_size)
-
-        # position_ids = (
-        #     torch.arange(T, device=x.device).unsqueeze(0).expand(B, -1)
-        # )  # (B, T)
-        # position_embeddings = self.positional_embedding(
-        #     position_ids
-        # )  # (B, T, Target_hidden_size)
 
         feats = self.mlp(extra_queries)  # (B, T, Target_hidden_size)
 

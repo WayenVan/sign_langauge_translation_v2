@@ -19,9 +19,10 @@ import os
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 os.environ["VLLM_USE_V1"] = "0"  # Use v1 API for vLLM
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"  # Adjust based on your GPU setup
 
-lang = "Chinese"  # Change this to the desired language
+# lang = "Chinese"  # Change this to the desired language
+lang = "English"  # Change this to the desired language
 mname = "google/gemma-3-27b-it"
 # mname = "sartifyllc/pawa-min-alpha"
 working_dir = f"outputs/ph14t_{lang.lower()}"

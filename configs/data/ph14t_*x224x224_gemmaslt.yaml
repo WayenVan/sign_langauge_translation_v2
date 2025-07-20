@@ -9,6 +9,7 @@ train:
     _target_: data.piplines.SLTGeneralPiplineTrain
     height: 224
     width: 224
+    downsample_rate: 2
   collator:
     _target_: data.collators.Gemma3SLTCollator
     mode: train
@@ -29,6 +30,7 @@ val:
     _target_: data.piplines.SLTGeneralPiplineTest
     height: 224
     width: 224
+    downsample_rate: 2
   collator:
     _target_: data.collators.Gemma3SLTCollator
     mode: val

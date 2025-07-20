@@ -103,8 +103,8 @@ class Gemma3SLT(LightningModule):
         self.visual_backbone = instantiate(self.cfg.model.backbone)
         self.visual_adapter = instantiate(self.cfg.model.visual_adapter)
 
-        if self.visual_backbone.is_lora:
-            return  # lora model, no need to freeze the backbone
+        if self.cfg.pretraining:
+            return
         else:
             for param in self.visual_backbone.parameters():
                 param.requires_grad = False
@@ -170,7 +170,10 @@ class Gemma3SLT(LightningModule):
         #     param.requires_grad = False
         # for param in self.mbart.base_model.decoder.embed_positions.parameters():
         #     param.requires_grad = Falsec
-        self.gemma.disable_adapter()
+        if self.cfg.pretraining:
+            for param in self.gemma.parameters():
+                param.requires_grad = False
+            self.gemma.eval()
 
     def forward(
         self,
