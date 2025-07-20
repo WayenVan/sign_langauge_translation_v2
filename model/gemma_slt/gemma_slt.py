@@ -171,6 +171,7 @@ class Gemma3SLT(LightningModule):
         # for param in self.mbart.base_model.decoder.embed_positions.parameters():
         #     param.requires_grad = Falsec
         if self.cfg.pretraining:
+            self.gemma.disable_adapter()
             for param in self.gemma.parameters():
                 param.requires_grad = False
             self.gemma.eval()
