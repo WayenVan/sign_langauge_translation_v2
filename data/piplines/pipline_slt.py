@@ -36,7 +36,7 @@ class SLTGeneralPiplineTrain:
         self.to_tensor = ToTensorVideo()
 
         # text transforms
-        self.delete = RandomWordAug(action="delete", aug_p=0.5)
+        # self.delete = RandomWordAug(action="delete", aug_p=0.5)
         # self.insert = RandomWordAug(action="insert", aug_p=0.5)
         self.downsample_rate = downsample_rate
 
@@ -49,7 +49,7 @@ class SLTGeneralPiplineTrain:
         video = video[:: self.downsample_rate]  # downsample video
         video = ToTensorVideo()(video)
 
-        text = self.delete.augment(text)[0]
+        # text = self.delete.augment(text)[0]
         # text = self.insert.augment(text)
 
         data["augmented_video"] = video

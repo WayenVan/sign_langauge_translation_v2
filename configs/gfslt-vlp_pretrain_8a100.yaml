@@ -7,7 +7,8 @@ defaults:
   - override model: gemma_slt_dino_lora
   # - override data: ph14t_*x224x224_gfslt
   # - override data: ph14t_*x224x224_mbart
-  - override data: ph14t_*x224x224_gemmaslt
+  # - override data: ph14t_*x224x224_gemmaslt
+  - override data: ph14t_*x224x224_gemmaslt_multiling
   # - override engine: adam_cosine_anneal
 
 data:

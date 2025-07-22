@@ -66,7 +66,10 @@ def test_datamodule():
     cfg.data.train.loader_kwargs.num_workers = 1
     # cfg.data.train.loader_kwargs.prefetch_factor = None
     cfg.data.val.loader_kwargs.num_workers = 1
+    cfg.data.val.loader_kwargs.shuffle = True
+
     cfg.data.train.loader_kwargs.batch_size = 2
+    cfg.data.train.loader_kwargs.shuffle = True
 
     # tokenizer = AutoTokenizer.from_pretrained(
     #     "facebook/mbart-large-cc25",
@@ -84,16 +87,16 @@ def test_datamodule():
 
     datamodule = DataModule(cfg.data, tokenizer=tokenizer)
     datamodule.setup("fit")
-    train_dataloader = datamodule.train_dataloader()
-    # train_dataloader = datamodule.val_dataloader()
+    # train_dataloader = datamodule.train_dataloader()
+    train_dataloader = datamodule.val_dataloader()
     for batch in tqdm(train_dataloader):
         # print(batch)
-        # print(batch["prompts"][0])
-        print(batch["text_input"][0])
-        print(batch["text_input_ids"][0])
-        print(batch["text_label_mask"][0])
-        # print(batch["translation"])
-        pass
+        print(batch["prompts"][0])
+        # print(batch["text_input"][0])
+        # print(batch["text_input_ids"][0])
+        # print(batch["text_label_mask"][0])
+        # print(batch["target_text"])
+        # pass
 
 
 def test_data_validation():
