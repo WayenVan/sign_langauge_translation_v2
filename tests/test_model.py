@@ -29,25 +29,56 @@ def test_slt_model():
     import polars as pl
 
     initialize(config_path="../configs")
-    cfg = compose("gfslt-vlp_pretrain_8a100")
+    cfg = compose("gfslt-vlp_pretrain_8a100_80g")
     cfg.data.train.loader_kwargs.batch_size = 2
     cfg.data.train.loader_kwargs.num_workers = 1
-    cfg.data.val.loader_kwargs.batch_size = 2
+    cfg.data.val.loader_kwargs.batch_size = 1
     cfg.data.val.loader_kwargs.num_workers = 1
 
     model = instantiate(cfg.model.type, cfg).to("cuda:4")
+
     for name, param in model.named_parameters():
         print(name)
 
     data_module = DataModule(cfg.data, model.tokenizer)
     data_module.setup()
 
+    # 检测nan
+    def check_nan(obj, prefix=""):
+        if isinstance(obj, torch.Tensor):
+            if torch.isnan(obj).any() or torch.isinf(obj).any():
+                return True, f"{prefix} - Tensor with NaN/Inf"
+        elif isinstance(obj, (tuple, list)):
+            for i, x in enumerate(obj):
+                has, msg = check_nan(x, prefix=f"{prefix}[{i}]")
+                if has:
+                    return True, msg
+        elif isinstance(obj, dict):
+            for k, x in obj.items():
+                has, msg = check_nan(x, prefix=f"{prefix}['{k}']")
+                if has:
+                    return True, msg
+        return False, ""
+
+    def nan_hook(module, inp, out):
+        for name, obj in [("input", inp), ("output", out)]:
+            has, msg = check_nan(obj, prefix=name)
+            if has:
+                raise RuntimeError(
+                    f"NaN/Inf found in {module.__class__.__name__} {msg}"
+                )
+
+    for n, m in model.gemma.named_modules():
+        print(n)
+        m.register_forward_hook(nan_hook)
+
     loader = data_module.train_dataloader()
     # loader = data_module.val_dataloader()
     model.train()
     for i, batch in enumerate(loader):
         with torch.autocast("cuda", dtype=torch.bfloat16):
-            model.training_step(batch, 0)
+            loss = model.training_step(batch, 0)
+            print(loss)
             # model.validation_step(batch, 0)
             print("ok")
 

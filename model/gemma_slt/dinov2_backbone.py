@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 class DinoV2Backbone(nn.Module):
-    def __init__(self, id, output_layer=-1, **lora_kwargs):
+    def __init__(self, id, output_layer=-1, enable_lora=False, **lora_kwargs):
         super().__init__()
         self.id = id
-        if lora_kwargs is None:
+        if not enable_lora:
             self.visual_encoder = Dinov2WithRegistersModel.from_pretrained(id)
             self.is_lora = False
         else:

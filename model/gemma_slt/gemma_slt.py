@@ -112,7 +112,10 @@ class Gemma3SLT(LightningModule):
 
         gemma = Gemma3ForConditionalGeneration.from_pretrained(
             mname,
+            # torch_dtype=torch.bfloat16,  # Use bfloat16 for better performance on TPUs
             torch_dtype=torch.bfloat16,  # Use bfloat16 for better performance on TPUs
+            # attn_implementation="flash_attention_2",  # Use flash attention for better performance
+            attn_implementation="eager",  # Use eager attention for better compatibility
         )
         lora_config = LoraConfig(
             **self.lora_config,
@@ -207,24 +210,25 @@ class Gemma3SLT(LightningModule):
         gemma_output = self.gemma.forward(
             attention_mask=input.attention_mask,  # [B, L]
             inputs_embeds=input.inputs_embeds,  # [B, L, D]
+            use_cache=False,
         )
 
         # get the end_of_video token as the global feature of the data
-        video_mask = input.video_mask
-        video_global_tokens = []
-        for b in range(B):
-            video_global_token_pos = video_mask[b].nonzero(as_tuple=True)[-1]
-            video_global_tokens.append(
-                gemma_output.last_hidden_state[b, video_global_token_pos, :]
-            )
-        video_global_tokens = torch.stack(
-            video_global_tokens, dim=0
-        ).contiguous()  # [B, D]
-
+        # video_mask = input.video_mask
+        # video_global_tokens = []
+        # for b in range(B):
+        #     video_global_token_pos = video_mask[b].nonzero(as_tuple=True)[-1]
+        #     video_global_tokens.append(
+        #         gemma_output.hidden_states[-1][b, video_global_token_pos, :]
+        #     )
+        # video_global_tokens = torch.stack(
+        #     video_global_tokens, dim=0
+        # ).contiguous()  # [B, D]
+        #
         return TupleOutput(
             gemma_output=gemma_output,  # Gemma3ForCausalLMOutput
             labels=labels,  # [B, L]
-            video_global_tokens=video_global_tokens,  # [B, D]
+            # video_global_tokens=video_global_tokens,  # [B, D]
         )
 
     def generate(

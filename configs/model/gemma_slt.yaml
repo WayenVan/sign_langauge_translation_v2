@@ -5,6 +5,7 @@ backbone:
   _target_: model.gemma_slt.DinoV2Backbone
   id: facebook/dinov2-with-registers-base
   output_layer: -2
+  enable_lora: False
 
 visual_adapter:
   _target_: model.gemma_slt.TokenSampleAdapter
@@ -27,4 +28,4 @@ lora_config:
   bias: none
 
 chat_template: jinjas/gemma_slt.jinja
-random_video_mask: 0.9
+random_video_mask: 0.0
