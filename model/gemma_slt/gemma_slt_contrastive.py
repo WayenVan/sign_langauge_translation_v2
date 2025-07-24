@@ -525,10 +525,6 @@ class Gemma3SLTForContrastiveLearning(LightningModule):
     #     self.train_accu_visual.reset()
 
     def validation_step(self, batch, batch_idx):
-        assert batch["text_label_mask"] is not None, (
-            "text_label_mask is required for training"
-        )
-
         output_1 = self.forward(
             video=batch["video_aug1"],  # [B, T, C, H, W]
             video_length=batch["video_length"],  # [B]
