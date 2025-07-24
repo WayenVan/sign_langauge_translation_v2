@@ -454,7 +454,7 @@ class Gemma3SLTForContrastiveLearning(LightningModule):
             text_label_mask=batch["text_label_mask"],  # [B, L] or None
         )
         output_2 = self.forward(
-            video=batch["video_aug1"],  # [B, T, C, H, W]
+            video=batch["video_aug2"],  # [B, T, C, H, W]
             video_length=batch["video_length"],  # [B]
             text_input_ids=batch["text_input_ids"],  # [B, L]
             text_attention_mask=batch["text_attention_mask"],  # [B, L]
@@ -493,10 +493,14 @@ class Gemma3SLTForContrastiveLearning(LightningModule):
             all_feats_2 = feats_2
         else:
             all_feats_1 = (
-                self.all_gather(feats_1).view(-1, feats_1.shape[-1]).contiguous()
+                self.all_gather(feats_1, sync_grads=True)
+                .view(-1, feats_1.shape[-1])
+                .contiguous()
             )  # [B*D]
             all_feats_2 = (
-                self.all_gather(feats_2).view(-1, feats_2.shape[-1]).contiguous()
+                self.all_gather(feats_2, sync_grads=True)
+                .view(-1, feats_2.shape[-1])
+                .contiguous()
             )
 
         loss = clip_loss(all_feats_1, all_feats_2)
