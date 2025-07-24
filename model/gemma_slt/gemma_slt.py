@@ -108,7 +108,8 @@ class Gemma3SLT(LightningModule):
         self.visual_backbone.eval()
 
     def _init_gemma_model(self):
-        mname = "google/gemma-3-4b-it"
+        # mname = "google/gemma-3-4b-it"
+        mname = self.cfg.model.mname
 
         gemma = Gemma3ForConditionalGeneration.from_pretrained(
             mname,
