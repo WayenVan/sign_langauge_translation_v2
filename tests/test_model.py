@@ -29,7 +29,7 @@ def test_slt_model():
     import polars as pl
 
     initialize(config_path="../configs")
-    cfg = compose("gfslt-vlp_pretrain_8a100_80g")
+    cfg = compose("gfslt-vlp_pretrain_8a100")
     cfg.data.train.loader_kwargs.batch_size = 2
     cfg.data.train.loader_kwargs.num_workers = 1
     cfg.data.val.loader_kwargs.batch_size = 1
@@ -37,8 +37,8 @@ def test_slt_model():
 
     model = instantiate(cfg.model.type, cfg).to("cuda:4")
 
-    for name, param in model.named_parameters():
-        print(name)
+    # for name, param in model.named_parameters():
+    #     print(name)
 
     data_module = DataModule(cfg.data, model.tokenizer)
     data_module.setup()
