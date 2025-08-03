@@ -12,12 +12,11 @@ class Ph14TGeneralDataset(Dataset):
     def __init__(self, data_root: str, mode: str = "train", pipline=None):
         self.data_root = data_root
         self.hg_dataset = load_dataset(
-            os.path.join(os.path.dirname(__file__), "ph14t_builder.py"),
-            data_dir=data_root,
+            "WayenVan/PHOENIX-Weather14T",
             split=mode,
-            trust_remote_code=True,
+            name="video_level",
         )
-        self.df = self.hg_dataset.to_polars()
+        # self.df = self.hg_dataset.to_polars()
         self.mode = mode
 
         self.pipline = pipline
@@ -31,9 +30,9 @@ class Ph14TGeneralDataset(Dataset):
 
     def __getitem__(self, idx):
         id = self.ids[idx]
-        data_info = self.get_data_info_by_id(id)
+        data_info = self.hg_dataset[idx]
 
-        video_frame_file_name = data_info["frame_files"]
+        video_frame_file_name = data_info["frames"]
         video_frame = []
         for frame_file in video_frame_file_name:
             image = cv2.imread(os.path.join(self.data_root, frame_file))
@@ -53,31 +52,10 @@ class Ph14TGeneralDataset(Dataset):
 
         return ret
 
-    def get_data_info_by_id(self, id: str):
-        if id not in self.ids:
-            raise ValueError(f"ID {id} not found in the dataset.")
-
-        selected = self.df.filter(pl.col("name") == id)
-        framefiles = selected.sort("frame_index")["frame_file"].to_list()
-
-        if not framefiles:
-            raise ValueError(f"No frame files found for ID {id}.")
-
-        selected = selected.drop("frame_file", "frame_index").unique()
-
-        assert len(selected) == 1, (
-            f"Expected one entry for ID {id}, found {len(selected)}."
-        )
-
-        data_info = selected.to_dicts()[0]
-        data_info["frame_files"] = [p["path"] for p in framefiles]
-
-        return data_info
-
 
 if __name__ == "__main__":
     data_root = "dataset/PHOENIX-2014-T-release-v3/"
-    ph14t_dataset = Ph14TDataset(data_root, mode="train")
+    ph14t_dataset = Ph14TGeneralDataset(data_root, mode="train")
     print(f"Dataset size: {len(ph14t_dataset)}")
     for i in range(10):
         data_info = ph14t_dataset[i]

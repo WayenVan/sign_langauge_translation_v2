@@ -1,3 +1,4 @@
+*.db
 ty.toml
 stubs/
 wandb/

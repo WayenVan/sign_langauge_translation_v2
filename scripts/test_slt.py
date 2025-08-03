@@ -1,9 +1,7 @@
 import sys
 import os
 import logging
-import click
 import typer
-from typing import Optional
 
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

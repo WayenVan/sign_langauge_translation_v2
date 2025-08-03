@@ -10,7 +10,6 @@ import os
 
 from tensordict import TensorDict
 
-
 from omegaconf import OmegaConf, DictConfig
 
 from hydra.utils import instantiate
@@ -32,7 +31,6 @@ from transformers.models.gemma.tokenization_gemma_fast import GemmaTokenizerFast
 from transformers.models.gemma3.configuration_gemma3 import Gemma3Config
 from peft import get_peft_model, LoraConfig, TaskType
 
-from transformers.models.mbart.configuration_mbart import MBartConfig
 from transformers.modeling_outputs import BaseModelOutput
 from torchmetrics import Accuracy
 from torchmetrics.text import BLEUScore
@@ -41,7 +39,8 @@ import copy
 from misc.tuple_output import TupleOutput
 from enum import Enum
 
-from trl import AutoModelForSeq2SeqLMWithValueHead
+
+# from trl import AutoModelForSeq2SeqLMWithValueHead
 # logger = logging.getLogger(__name__)
 
 
@@ -55,6 +54,18 @@ def build_mlp(depth, hidden_size, output_hidden_size):
 
 class Gemma3SLT(LightningModule):
     MAX_TOKEN_LENGTH = 1024  # Maximum token length for MBart
+
+    gemma_config: Gemma3Config
+    gemma: Gemma3ForConditionalGeneration  # Gemma model instance
+    tokenizer: GemmaTokenizerFast  # Tokenizer for Gemma
+    d_model: int  # Dimension of the model
+
+    start_video_id: int  # ID for the start of video token
+    start_video_embds: nn.Parameter  # Start video embeddings
+    end_video_embeds: nn.Parameter  # End video embeddings
+
+    cfg: DictConfig  # Configuration for the model
+    random_video_mask: float  # Probability of random video masking
 
     def __init__(self, cfg):
         super().__init__()
@@ -107,9 +118,9 @@ class Gemma3SLT(LightningModule):
             param.requires_grad = False
         self.visual_backbone.eval()
 
-    def _init_gemma_model(self):
-        # mname = "google/gemma-3-4b-it"
+    def _init_gemma_model(self) -> None:
         mname = self.cfg.model.mname
+        # mname = "google/gemma-3-4b-it"
 
         gemma = Gemma3ForConditionalGeneration.from_pretrained(
             mname,
