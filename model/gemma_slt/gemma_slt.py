@@ -411,17 +411,16 @@ class Gemma3SLT(LightningModule):
         B = video_length.shape[0]
 
         video_feats = self.visual_backbone(video)  # [BT, CLS+HW+REGISTIRY, C]
+        video_feats, video_length = self.visual_adapter(
+            video_feats, video_length
+        )  # [BT,  D]
 
         video_feats = torch.split(
             video_feats, video_length.tolist(), dim=0
-        )  # list of [T, CLS+HW+REGISTIRY, C]
+        )  # list of [T, C]
         video_feats = pad_sequence(
             list(video_feats), batch_first=True, padding_value=0.0
-        ).contiguous()  # [B, T, CLS+HW+REGISTIRY, C]
-
-        video_feats, video_length = self.visual_adapter(
-            video_feats, video_length
-        )  # [B, T, D]
+        ).contiguous()  # [B, T, D]
 
         video_feats = self.visual_position_embedding_forward(video_feats)
 

@@ -13,7 +13,7 @@ if __name__ == "__main__":
 
     dataset = Ph14TGeneralDataset(data_root, mode)
 
-    i = 0  # 选择第一个样本
+    i = 4  # 选择第一个样本
     data = dataset[i]
     print(data["video"].shape)
     frames = data["video"]

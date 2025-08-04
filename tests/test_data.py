@@ -7,6 +7,7 @@ from hydra import compose, initialize
 from hydra.utils import instantiate
 from transformers import AutoTokenizer
 from data.datamodule import DataModule
+from data.ph14t import Ph14TGeneralDataset
 
 
 def test_max_data_length():
@@ -27,7 +28,7 @@ def test_dataset():
     data_root = "dataset/PHOENIX-2014-T-release-v3"
     mode = "train"
 
-    dataset = Ph14TDataset(data_root, mode)
+    dataset = Ph14TGeneralDataset(data_root, mode)
 
     for i in tqdm(range(len(dataset))):
         data = dataset[i]
@@ -46,17 +47,6 @@ def test_max_data_length():
         if lentgh > max_length:
             max_length = lentgh
     print(max_length)
-
-
-def test_dataset():
-    data_root = "dataset/PHOENIX-2014-T-release-v3"
-    mode = "train"
-
-    dataset = Ph14TDataset(data_root, mode)
-
-    for i in tqdm(range(len(dataset))):
-        data = dataset[i]
-        print(data["video"].shape)
 
 
 def test_datamodule():
@@ -126,7 +116,7 @@ def test_data_validation():
 
 
 if __name__ == "__main__":
-    # test_dataset()
-    test_datamodule()
+    test_dataset()
+    # test_datamodule()
     # test_data_validation()
     # test_max_data_length()
