@@ -2,18 +2,21 @@ import sys
 
 sys.path.append(".")
 import numpy as np
-from data.ph14t import Ph14TGeneralDataset
+from data.ph14t import Ph14TGeneralDataset, Ph14TMultiLinglDataset
 from tqdm import tqdm
 import cv2
 
 
 if __name__ == "__main__":
     data_root = "dataset/PHOENIX-2014-T-release-v3"
+    en_data_root = "large_files/ph14t_english"
+    zh_data_root = "large_files/ph14t_chinese"
     mode = "train"
 
-    dataset = Ph14TGeneralDataset(data_root, mode)
+    # dataset = Ph14TGeneralDataset(data_root, mode)
+    dataset = Ph14TMultiLinglDataset(data_root, zh_data_root, en_data_root, mode)
 
-    i = 4  # 选择第一个样本
+    i = 18  # 选择第一个样本
     data = dataset[i]
     print(data["video"].shape)
     frames = data["video"]

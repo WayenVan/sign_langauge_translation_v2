@@ -31,7 +31,7 @@ val:
     data_root: ${data.data_root}
     en_data_root: ${data.en_data_root}
     zh_data_root: ${data.zh_data_root}
-    mode: validation
+    mode: dev
   pipline:
     _target_: data.piplines.SLTGeneralPiplineTest
     height: 224

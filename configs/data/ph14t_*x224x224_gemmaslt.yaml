@@ -25,7 +25,7 @@ val:
   dataset:
     _target_: data.ph14t.Ph14TGeneralDataset
     data_root: ${data.data_root}
-    mode: validation
+    mode: dev
   pipline:
     _target_: data.piplines.SLTGeneralPiplineTest
     height: 224

@@ -60,7 +60,7 @@ class Gemma3SLT(LightningModule):
     tokenizer: GemmaTokenizerFast  # Tokenizer for Gemma
     d_model: int  # Dimension of the model
 
-    start_video_id: int  # ID for the start of video token
+    image_soft_id: int  # ID for the start of video token
     start_video_embds: nn.Parameter  # Start video embeddings
     end_video_embeds: nn.Parameter  # End video embeddings
 
@@ -153,7 +153,7 @@ class Gemma3SLT(LightningModule):
         self.gemma_config = Gemma3Config.from_pretrained(mname).get_text_config()
         self.d_model = self.gemma_config.hidden_size
 
-        self.start_video_id = self.tokenizer.convert_tokens_to_ids("<start_of_image>")
+        self.image_soft_id = self.tokenizer.convert_tokens_to_ids("<image_soft_token>")
 
         self.start_video_embds = nn.Parameter(
             torch.zeros(1, self.d_model, dtype=torch.float32, device=self.device),
@@ -205,6 +205,8 @@ class Gemma3SLT(LightningModule):
             text_label_mask=text_label_mask,
         )
         labels = None
+
+        # shift the input_ids to the right for causal language modeling
         if text_label_mask is not None:
             labels = torch.cat(
                 [
@@ -276,97 +278,52 @@ class Gemma3SLT(LightningModule):
         text_label_mask: Tensor | None = None,  # [B, L], optional label mask for text
     ):
         B = video_length.shape[0]
+
         visual_output = self.get_visual_feats(video, video_length)
         _, T, D = visual_output.visual_feats.shape
+        t_length = visual_output.t_length  # [B]
+        attention_mask = text_attention_mask
 
-        input_ids = []
-        attention_mask = []
-        label_mask = []
-        video_mask = []
+        visual_feats = torch.split(
+            visual_output.visual_feats, t_length.tolist(), dim=0
+        )  # list of [T, D]
+
+        video_mask_text = text_input_ids.eq(self.image_soft_id).long()  # [B, L]
+        t_length_text = video_mask_text.sum(
+            dim=1
+        )  # [B], number of video tokens in text
+
+        assert (t_length_text == t_length + 2).all(), (
+            "The length of text and video must be the same."
+        )  # NOTE: 2 extra tokens for video was added
+
         extened_visual_feats = []
         for b in range(B):
-            video_token_pos = (
-                text_input_ids[b].eq(self.start_video_id).nonzero(as_tuple=True)[0]
+            start_video_pos = (
+                text_input_ids[b].eq(self.image_soft_id).nonzero(as_tuple=True)[0][0]
             )
-            _input_ids = torch.cat(
-                [
-                    text_input_ids[b, :video_token_pos],  # before the first video token
-                    torch.full(
-                        (T + 2,), self.tokenizer.pad_token_id, device=self.device
-                    ),  # video tokens
-                    text_input_ids[
-                        b, video_token_pos + 1 :
-                    ],  # after the first video token
-                ]
-            )
-            _attention_mask = torch.cat(
-                [
-                    text_attention_mask[
-                        b, :video_token_pos
-                    ],  # before the first video token
-                    torch.ones(1, device=self.device),  # first video token
-                    visual_output.attention_mask[b, :],  # video tokens
-                    torch.ones(1, device=self.device),
-                    text_attention_mask[
-                        b, video_token_pos + 1 :
-                    ],  # after the first video token
-                ]
-            )
-            if text_label_mask is not None:
-                _label_mask = torch.cat(
-                    [
-                        text_label_mask[
-                            b, :video_token_pos
-                        ],  # before the first video token
-                        torch.zeros(T + 2, device=self.device),  # video tokens
-                        text_label_mask[
-                            b, video_token_pos + 1 :
-                        ],  # after the first video token
-                    ]
-                )
-                label_mask.append(_label_mask)
-
-            _video_mask = torch.cat(
-                [
-                    torch.zeros(video_token_pos, device=self.device),  # before
-                    torch.ones(T + 2, device=self.device),  # video tokens
-                    torch.zeros(
-                        text_input_ids.shape[1] - video_token_pos - 1,
-                        device=self.device,
-                    ),  # after
-                ]
+            end_video_pos = (
+                text_input_ids[b].eq(self.image_soft_id).nonzero(as_tuple=True)[0][-1]
             )
             _ex_visual_feat = torch.cat(
                 [
-                    torch.zeros(video_token_pos, D, device=self.device),  # before
+                    torch.zeros(start_video_pos, D, device=self.device),  # before
                     self.start_video_embds,
-                    visual_output.visual_feats[b, :, :],  # video tokens
+                    visual_feats[b],
                     self.end_video_embeds,
                     torch.zeros(
-                        text_input_ids.shape[1] - video_token_pos - 1,
+                        text_input_ids.shape[1] - end_video_pos - 1,
                         D,
                         device=self.device,
                     ),  # after
                 ]
             )
-            input_ids.append(_input_ids)
-            attention_mask.append(_attention_mask)
-            video_mask.append(_video_mask)
             extened_visual_feats.append(_ex_visual_feat)
 
-        input_ids = torch.stack(input_ids, dim=0)  # [B, L]
-        attention_mask = torch.stack(attention_mask, dim=0)  # [B, L]
-        video_mask = torch.stack(video_mask, dim=0)  # [B, L]
-        if text_label_mask is not None:
-            label_mask = torch.stack(label_mask, dim=0)  # [B, L]
-        extened_visual_feats = torch.stack(extened_visual_feats, dim=0)
-
-        text_embedding = self.gemma.get_input_embeddings()(input_ids)
-
-        # replace the video token with the visual featurers
-        inputs_embeds = (
-            text_embedding * (1 - video_mask.unsqueeze(-1)).float()
-            + extened_visual_feats
+        inputs_embeds = torch.where(
+            video_mask_text.bool(),  # [B, L]
+            torch.stack(extened_visual_feats, dim=0),  # [B, L, D]
+            self.gemma.get_input_embeddings()(text_input_ids).contiguous(),  # [B, L, D]
         )
 
         if self.training and self.random_video_mask > 0.0:
@@ -374,30 +331,34 @@ class Gemma3SLT(LightningModule):
                 attention_mask, device=self.device, dtype=torch.float32
             ) * (1.0 - self.random_video_mask)
             random_temporal_mask = random_temporal_mask.bernoulli()
-            random_temporal_mask = random_temporal_mask.bool() | ~video_mask.bool()
+            random_temporal_mask = random_temporal_mask.bool() | ~video_mask_text.bool()
 
             attention_mask = attention_mask * random_temporal_mask.long()
 
         return TupleOutput(
-            input_ids=input_ids,  # [B, L]
+            input_ids=text_input_ids,  # [B, L]
             attention_mask=attention_mask,  # [B, L]
             inputs_embeds=inputs_embeds,  # [B, L, D]
-            label_mask=label_mask if text_label_mask is not None else None,  # [B, L]
-            video_mask=video_mask,  # [B, L]
+            label_mask=text_label_mask,
+            video_mask=video_mask_text,  # [B, L]
         )
 
-    def visual_position_embedding_forward(self, video_feats: Tensor):
+    def visual_position_embedding_forward(
+        self, video_feats: Tensor, video_length: Tensor
+    ):
         """
         Forward pass through the visual position embedding.
         args:
-            video_feats: Tensor, shape [B, T, D], video features
+            video_feats: Tensor, shape [BT, D], video features
+            video_length: Tensor, shape [B], length of each video in the batch
         """
-        B, T, D = video_feats.shape
-        position_ids = (
-            torch.arange(T, device=video_feats.device).unsqueeze(0).expand(B, -1)
+        B = video_length.shape[0]
+        position_ids = torch.cat(
+            [torch.arange(video_length[b], device=video_feats.device) for b in range(B)]
         )
+
         position_embeddings = self.visual_position_embedding(position_ids)
-        return video_feats + position_embeddings  # [B, T, D]
+        return video_feats + position_embeddings  # [BT, D]
 
     def get_visual_feats(self, video: Tensor, video_length: Tensor):
         """
@@ -415,21 +376,11 @@ class Gemma3SLT(LightningModule):
             video_feats, video_length
         )  # [BT,  D]
 
-        video_feats = torch.split(
-            video_feats, video_length.tolist(), dim=0
-        )  # list of [T, C]
-        video_feats = pad_sequence(
-            list(video_feats), batch_first=True, padding_value=0.0
-        ).contiguous()  # [B, T, D]
+        video_feats = self.visual_position_embedding_forward(
+            video_feats, video_length
+        )  # [BT, D]
 
-        video_feats = self.visual_position_embedding_forward(video_feats)
-
-        attention_mask = self.length_to_mask(video_length)
-
-        return TupleOutput(
-            visual_feats=video_feats,
-            attention_mask=attention_mask,  # [B, 1+T]
-        )
+        return TupleOutput(visual_feats=video_feats, t_length=video_length)
 
     @staticmethod
     def length_to_mask(lengths, max_length=None):

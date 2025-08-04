@@ -13,10 +13,14 @@ class Gemma3SLTCollator:
     def __init__(
         self,
         tokenizer,
+        video_token_scale: int = 2,
+        num_extra_video_tokens: int = 2,
         mode="train",
     ):
         self.tokenizer = tokenizer
         self.mode = mode
+        self.video_token_scale = video_token_scale
+        self.num_extra_video_tokens = num_extra_video_tokens
 
     @staticmethod
     def pad_dim_to_multiple_of_4(tensor, dim):
@@ -35,6 +39,12 @@ class Gemma3SLTCollator:
         # 复制 pad_size 次
         padding = last_element.repeat_interleave(pad_size, dim=dim)
         return torch.cat([tensor, padding], dim=dim).contiguous()
+
+    @staticmethod
+    def inject_images(prompt: str, n: int) -> str:
+        sentinel = "<start_of_image>"
+        replacement = "<image_soft_token>" * n
+        return prompt.replace(sentinel, replacement)
 
     def __call__(self, batch):
         # Collate a batch of samples.
@@ -55,21 +65,32 @@ class Gemma3SLTCollator:
 
         video_tensor = torch.cat(videos, dim=0).contiguous()
         video_lengths_tensor = torch.tensor(video_lengths)
+        assert (video_lengths_tensor % self.video_token_scale == 0).all(), (
+            "All video lengths must be divisible by the video token scale."
+        )
 
         prompts = []
         n_labels = []
         text_input_ids = []
         text_input = []
-        for t in zbatch["text"]:
+        for i, t in enumerate(zbatch["text"]):
             message = [{"role": "user", "language": Language.DE.value}]
-            prompt_ids = self.tokenizer.apply_chat_template(
+            prompt = self.tokenizer.apply_chat_template(
                 message,
                 add_generation_prompt=True,
                 enable_thinking=False,
-                tokenize=True,
+                tokenize=False,
             )
-            prompts.append(self.tokenizer.decode(prompt_ids, skip_special_tokens=False))
+            # inject images if needed
+            if "<start_of_image>" in prompt:
+                prompt = self.inject_images(
+                    prompt,
+                    video_lengths[i] // self.video_token_scale
+                    + self.num_extra_video_tokens,
+                )
+            prompts.append(prompt)
 
+            prompt_ids = self.tokenizer(prompt, add_special_tokens=False).input_ids
             label_ids = self.tokenizer(t, add_special_tokens=False).input_ids
 
             if self.mode == "train":
@@ -108,8 +129,8 @@ class Gemma3SLTCollator:
             "names": names,
             "video_length": video_lengths_tensor,
             "text_input": text_input,
-            "text_input_ids": text_src_input.input_ids,
             "text_attention_mask": text_src_input.attention_mask,
+            "text_input_ids": text_src_input.input_ids,
             "text_label_mask": text_label_mask,
             "target_text": texts,
             "prompts": prompts,

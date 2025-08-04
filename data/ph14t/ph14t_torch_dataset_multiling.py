@@ -24,25 +24,19 @@ class Ph14TMultiLinglDataset(Dataset):
         self.mode = mode
 
         self.hg_dataset = load_dataset(
-            os.path.join(os.path.dirname(__file__), "ph14t_builder.py"),
-            data_dir=data_root,
+            "WayenVan/PHOENIX-Weather14T",
             split=mode,
-            trust_remote_code=True,
+            name="video_level",
         )
         self.origin_df = self.hg_dataset.to_polars()
 
-        prefix_map = {
-            "train": "train",
-            "validation": "dev",
-            "test": "test",
-        }
         self.zh_df = pl.read_csv(
-            os.path.join(zh_data_root, f"ph14t_{prefix_map[mode]}_Chinese.csv"),
+            os.path.join(zh_data_root, f"ph14t_{mode}_Chinese.csv"),
             has_header=True,
             separator="|",
         )
         self.en_df = pl.read_csv(
-            os.path.join(en_data_root, f"ph14t_{prefix_map[mode]}_English.csv"),
+            os.path.join(en_data_root, f"ph14t_{mode}_English.csv"),
             has_header=True,
             separator="|",
         )
@@ -87,7 +81,7 @@ class Ph14TMultiLinglDataset(Dataset):
 
         data_info = self.get_data_info_by_id(id)
 
-        video_frame_file_name = data_info["frame_files"]
+        video_frame_file_name = data_info["frames"]
         video_frame = []
         for frame_file in video_frame_file_name:
             image = cv2.imread(os.path.join(self.data_root, frame_file))
@@ -121,19 +115,12 @@ class Ph14TMultiLinglDataset(Dataset):
             raise ValueError(f"ID {id} not found in the dataset.")
 
         selected = self.origin_df.filter(pl.col("name") == id)
-        framefiles = selected.sort("frame_index")["frame_file"].to_list()
-
-        if not framefiles:
-            raise ValueError(f"No frame files found for ID {id}.")
-
-        selected = selected.drop("frame_file", "frame_index").unique()
 
         assert len(selected) == 1, (
             f"Expected one entry for ID {id}, found {len(selected)}."
         )
 
         data_info = selected.to_dicts()[0]
-        data_info["frame_files"] = [p["path"] for p in framefiles]
 
         return data_info
 
@@ -149,7 +136,7 @@ if __name__ == "__main__":
     print(f"Dataset size: {len(ph14t_dataset)}")
 
     for i in range(10):
-        data_info = ph14t_dataset[i + 20000]
+        data_info = ph14t_dataset[i + 10000]
         print(data_info["text"])
         # print(
         #     f"ID: {data_info['id']}, Video shape: {data_info['video'].shape}, Text: {data_info['text']}"

@@ -131,14 +131,15 @@ class PEAdapter(nn.Module):
         self,
         input_hidden_size: int,
         output_hidden_size: int,
-        scale_factor: int,
+        spatial_scale_factor: int,
+        temporal_scale_factor: int,
         pooling_num_heads: int,
         pooling_num_probe: int = 1,
         pooling_mlp_ratio: int = 4,
     ):
         super().__init__()
         self.spatial_shuffle_connector = SpatialShuffleConnector(
-            input_hidden_size, output_hidden_size, scale_factor
+            input_hidden_size, output_hidden_size, spatial_scale_factor
         )
         self.pooling = AttentionPooling(
             output_hidden_size,
@@ -148,14 +149,16 @@ class PEAdapter(nn.Module):
             act_layer=nn.SiLU,
         )
         self.temporal_shuffle_connector = TemporalShuffleConnector(
-            output_hidden_size, output_hidden_size, scale_factor
+            output_hidden_size, output_hidden_size, temporal_scale_factor
         )
 
     def forward(self, video_hidden_states, t_length=None):
         """
-        video_hidden_states: [B, T, D]
+        video_hidden_states: [B, CLS+L, D]
         t_length: [B]
         """
+        cls = video_hidden_states[:, 0, :].unsqueeze(1)  # [B, 1, D]
+        video_hidden_states = video_hidden_states[:, 1:, :]  # [B, T
 
         # spatial shuffle
         video_hidden_states = self.spatial_shuffle_connector(video_hidden_states)

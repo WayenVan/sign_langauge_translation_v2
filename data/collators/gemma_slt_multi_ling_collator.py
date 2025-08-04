@@ -13,10 +13,17 @@ class Gemma3SLTMultilingCollator:
     def __init__(
         self,
         tokenizer,
+        video_token_scale: int = 2,
+        num_extra_video_tokens: int = 2,
         mode="train",
     ):
         self.tokenizer = tokenizer
         self.mode = mode
+        self.video_token_scale = video_token_scale
+        self.num_extra_video_tokens = num_extra_video_tokens
+        self.image_soft_token_id = self.tokenizer.convert_tokens_to_ids(
+            "<image_soft_token>"
+        )
 
     @staticmethod
     def pad_dim_to_multiple_of_4(tensor, dim):
@@ -35,6 +42,12 @@ class Gemma3SLTMultilingCollator:
         # 复制 pad_size 次
         padding = last_element.repeat_interleave(pad_size, dim=dim)
         return torch.cat([tensor, padding], dim=dim).contiguous()
+
+    @staticmethod
+    def inject_images(prompt: str, n: int) -> str:
+        sentinel = "<start_of_image>"
+        replacement = "<image_soft_token>" * n
+        return prompt.replace(sentinel, replacement)
 
     def __call__(self, batch):
         # Collate a batch of samples.
@@ -71,14 +84,22 @@ class Gemma3SLTMultilingCollator:
             else:
                 raise ValueError(f"Unsupported language: {zbatch['language'][i]}")
 
-            prompt_ids = self.tokenizer.apply_chat_template(
+            prompt = self.tokenizer.apply_chat_template(
                 message,
                 add_generation_prompt=True,
                 enable_thinking=False,
-                tokenize=True,
+                tokenize=False,
             )
-            prompts.append(self.tokenizer.decode(prompt_ids, skip_special_tokens=False))
+            # inject images if needed
+            if "<start_of_image>" in prompt:
+                prompt = self.inject_images(
+                    prompt,
+                    video_lengths[i] // self.video_token_scale
+                    + self.num_extra_video_tokens,
+                )
+            prompts.append(prompt)
 
+            prompt_ids = self.tokenizer(prompt, add_special_tokens=False).input_ids
             label_ids = self.tokenizer(t, add_special_tokens=False).input_ids
 
             if self.mode == "train":
@@ -112,6 +133,12 @@ class Gemma3SLTMultilingCollator:
             text_label_mask = None
 
         # Prepare source input
+        assert (
+            text_src_input.input_ids.eq(self.image_soft_token_id).sum(-1)
+            == video_lengths_tensor // self.video_token_scale
+            + self.num_extra_video_tokens
+        ).all(), "The number of image soft tokens does not match the expected number."
+
         return {
             "video": video_tensor,
             "names": names,

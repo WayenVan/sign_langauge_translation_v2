@@ -15,8 +15,18 @@ def test_pe():
     initialize(config_path="../configs")
     cfg = compose("gfslt-vlp_pretrain_mec")
 
-    model = instantiate(cfg.model.backbone)
-    print(model.__class__.__name__)
+    model = instantiate(cfg.model.type, cfg)
+
+    input = torch.randn(8 + 16, 3, 224, 224).cuda()  # Example input tensor
+    length = torch.tensor([8, 16]).cuda()  # Example length tensor
+    model.visual_backbone.cuda()
+    model.visual_adapter.cuda()
+    model.visual_position_embedding.cuda()
+    model.gemma.get_input_embeddings().cuda()
+    with torch.no_grad():
+        out = model.get_visual_feats(input, length)
+    print(out.visual_feats.shape)  # Should print the shape of the output tensor
+    print(out.t_length)  # Should print the length tensor
 
 
 if __name__ == "__main__":

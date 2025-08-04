@@ -51,12 +51,12 @@ def test_max_data_length():
 
 def test_datamodule():
     initialize(config_path="../configs")
-    cfg = compose("gfslt-vlp_pretrain_8a100")
+    cfg = compose("gfslt-vlp_pretrain_mec")
 
     cfg.data.train.loader_kwargs.num_workers = 1
     # cfg.data.train.loader_kwargs.prefetch_factor = None
     cfg.data.val.loader_kwargs.num_workers = 1
-    cfg.data.val.loader_kwargs.shuffle = True
+    # cfg.data.val.loader_kwargs.shuffle = True
 
     cfg.data.train.loader_kwargs.batch_size = 2
     cfg.data.train.loader_kwargs.shuffle = True
@@ -77,11 +77,12 @@ def test_datamodule():
 
     datamodule = DataModule(cfg.data, tokenizer=tokenizer)
     datamodule.setup("fit")
-    # train_dataloader = datamodule.train_dataloader()
-    train_dataloader = datamodule.val_dataloader()
+    train_dataloader = datamodule.train_dataloader()
+    # train_dataloader = datamodule.val_dataloader()
     for batch in tqdm(train_dataloader):
         # print(batch)
-        print(batch["prompts"][0])
+        print(batch["text_input"][0])
+        print(batch["lang"][0])
         # print(batch["text_input"][0])
         # print(batch["text_input_ids"][0])
         # print(batch["text_label_mask"][0])
@@ -116,7 +117,7 @@ def test_data_validation():
 
 
 if __name__ == "__main__":
-    test_dataset()
-    # test_datamodule()
+    # test_dataset()
+    test_datamodule()
     # test_data_validation()
     # test_max_data_length()
