@@ -13,7 +13,8 @@ from typing import NamedTuple, List
 import logging
 
 logger = logging.getLogger(__name__)
-from .core.vision_encoder import pe
+
+from core.vision_encoder import pe
 
 
 class PerceptionEncoderBackbone(nn.Module):
