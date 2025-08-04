@@ -1,20 +1,9 @@
-from transformers.models.dinov2_with_registers.modeling_dinov2_with_registers import (
-    Dinov2WithRegistersModel,
-)
 from torch import nn
-import torch
-from peft import LoraConfig, TaskType, get_peft_model, PeftConfig
-import re
-
-from einops import rearrange
-
-from typing import NamedTuple, List
+from .vision_encoder import pe
 
 import logging
 
 logger = logging.getLogger(__name__)
-
-from core.vision_encoder import pe
 
 
 class PerceptionEncoderBackbone(nn.Module):
