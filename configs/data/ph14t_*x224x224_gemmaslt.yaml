@@ -9,7 +9,7 @@ train:
     _target_: data.piplines.SLTGeneralPiplineTrain
     height: 224
     width: 224
-    downsample_rate: 2
+    downsample_rate: 1
   collator:
     _target_: data.collators.Gemma3SLTCollator
     mode: train
@@ -19,7 +19,7 @@ train:
     num_workers: 6
     persistent_workers: true
     multiprocessing_context: spawn
-    prefetch_factor: 2
+    prefetch_factor: 1
 
 val:
   dataset:
