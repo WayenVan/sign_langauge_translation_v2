@@ -217,6 +217,14 @@ class Gemma3SLT(LightningModule):
                 ],
                 dim=1,
             )
+            text_label_mask = torch.cat(
+                [
+                    text_label_mask[:, 1:],  # <bos>
+                    torch.ones((B, 1), device=self.device),  # <eos>
+                ],
+                dim=1,
+            )
+
             labels = labels.masked_fill(
                 input.label_mask == 0, -100
             )  # only preserve the text labels
@@ -280,7 +288,7 @@ class Gemma3SLT(LightningModule):
         B = video_length.shape[0]
 
         visual_output = self.get_visual_feats(video, video_length)
-        _, T, D = visual_output.visual_feats.shape
+        _, D = visual_output.visual_feats.shape
         t_length = visual_output.t_length  # [B]
         attention_mask = text_attention_mask
 
@@ -299,12 +307,8 @@ class Gemma3SLT(LightningModule):
 
         extened_visual_feats = []
         for b in range(B):
-            start_video_pos = (
-                text_input_ids[b].eq(self.image_soft_id).nonzero(as_tuple=True)[0][0]
-            )
-            end_video_pos = (
-                text_input_ids[b].eq(self.image_soft_id).nonzero(as_tuple=True)[0][-1]
-            )
+            start_video_pos = video_mask_text[b].nonzero(as_tuple=True)[0][0]
+            end_video_pos = video_mask_text[b].nonzero(as_tuple=True)[0][-1]
             _ex_visual_feat = torch.cat(
                 [
                     torch.zeros(start_video_pos, D, device=self.device),  # before
@@ -321,7 +325,7 @@ class Gemma3SLT(LightningModule):
             extened_visual_feats.append(_ex_visual_feat)
 
         inputs_embeds = torch.where(
-            video_mask_text.bool(),  # [B, L]
+            video_mask_text.bool().unsqueeze(-1),  # [B, L, 1]
             torch.stack(extened_visual_feats, dim=0),  # [B, L, D]
             self.gemma.get_input_embeddings()(text_input_ids).contiguous(),  # [B, L, D]
         )

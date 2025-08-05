@@ -1,0 +1,38 @@
+defaults:
+  - base_gfslt-vlp
+  # - override modules: dinov2_base
+  # - override model: mbart_slt
+  # - override model: mbart_slt_stc
+  - override model: gemma_slt_pe_shuffle
+  # - override model: gemma_slt_dino_lora
+  # - override data: ph14t_*x224x224_gfslt
+  # - override data: ph14t_*x224x224_mbart
+  # - override data: ph14t_*x224x224_gemmaslt
+  - override data: ph14t_*x224x224_gemmaslt_multiling
+  # - override engine: adam_cosine_anneal
+
+data:
+  train:
+    loader_kwargs:
+      batch_size: 4
+      num_workers: 10
+  val:
+    loader_kwargs:
+      batch_size: 2
+      num_workers: 10
+
+max_epochs: 200
+devices: [0, 1, 2, 3, 4, 5, 6, 7]
+precision: bf16-mixed
+
+engine:
+  optimizer:
+    lr: 1e-4
+  lr_scheduler:
+    instance:
+      eta_min: 1e-8
+
+visual_text_alignment_weight: 1.0
+log_interval: 10
+
+pretraining: False

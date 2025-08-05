@@ -29,13 +29,13 @@ def test_slt_model():
     import polars as pl
 
     initialize(config_path="../configs")
-    cfg = compose("gfslt-vlp_pretrain_8a100")
+    cfg = compose("gfslt-vlp_pretrain_ai4d")
     cfg.data.train.loader_kwargs.batch_size = 2
     cfg.data.train.loader_kwargs.num_workers = 1
     cfg.data.val.loader_kwargs.batch_size = 1
     cfg.data.val.loader_kwargs.num_workers = 1
 
-    model = instantiate(cfg.model.type, cfg).to("cuda:4")
+    model = instantiate(cfg.model.type, cfg).to("cuda:1")
 
     # for name, param in model.named_parameters():
     #     print(name)

@@ -1,7 +1,7 @@
 type:
   _target_: model.gemma_slt.Gemma3SLT
 
-mname: google/gemma-3-12b-pt
+mname: google/gemma-3-4b-it
 
 backbone:
   _target_: model.gemma_slt.PerceptionEncoderBackbone
@@ -10,7 +10,7 @@ backbone:
 visual_adapter:
   _target_: model.gemma_slt.PEAdapter
   input_hidden_size: 1024
-  output_hidden_size: 3840
+  output_hidden_size: 2560
   spatial_scale_factor: 4
   temporal_scale_factor: 2
   pooling_num_probe: 1

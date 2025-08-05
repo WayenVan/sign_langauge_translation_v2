@@ -119,7 +119,7 @@ class Gemma3SLTCollator:
             )
             for i, n_label in enumerate(n_labels):
                 # Set the mask to 0 for the label part
-                text_label_mask[i, -n_label - 1 :] = 1
+                text_label_mask[i, -n_label:] = 1
         else:
             text_label_mask = None
 
