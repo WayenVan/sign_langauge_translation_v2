@@ -22,7 +22,7 @@ data:
       num_workers: 10
 
 max_epochs: 200
-devices: [0, 1, 2, 3, 4, 5, 6, 7]
+devices: [1]
 precision: bf16-mixed
 
 engine:
@@ -32,7 +32,5 @@ engine:
     instance:
       eta_min: 1e-8
 
-visual_text_alignment_weight: 1.0
 log_interval: 10
-
-pretraining: False
+pretraining: True

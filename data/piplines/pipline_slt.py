@@ -11,7 +11,7 @@ from albumentations import (
 )
 from ..transforms import JitteredUniformSampleVideo, UniformSampleVideo, ToTensorVideo
 
-MEAN = (0.5, 0.5, 0.5)
+MEAN = (0.5, 0.5, 0.5)  # to fit the perception encoder
 STD = (0.5, 0.5, 0.5)
 
 

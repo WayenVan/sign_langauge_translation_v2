@@ -60,7 +60,7 @@ def init_logger(local_rank, output_dir: str):
 # NOTE: the hydra appp only inisitalize once
 @hydra.main(
     config_path="../configs",
-    config_name="gfslt-vlp_pretrain_8a100_80g",
+    config_name="gfslt-vlp_pretrain_ai4d",
     version_base="1.3.2",
 )
 def main(
@@ -79,7 +79,7 @@ def main(
         accelerator="gpu",
         strategy="ddp_find_unused_parameters_true",
         # devices=[2, 3, 4, 5, 6, 7],  # NOTE: specify the devices to use
-        devices=[6, 7],
+        devices=[1],
         callbacks=cbs,
         log_every_n_steps=cfg.log_interval,
         max_epochs=cfg.max_epochs,

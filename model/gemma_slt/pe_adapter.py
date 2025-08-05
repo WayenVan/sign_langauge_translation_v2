@@ -141,6 +141,10 @@ class PEAdapter(nn.Module):
         self.spatial_shuffle_connector = SpatialShuffleConnector(
             input_hidden_size, output_hidden_size, spatial_scale_factor
         )
+        self.cls_projection = nn.Linear(
+            input_hidden_size, output_hidden_size, bias=False
+        )
+
         self.pooling = AttentionPooling(
             output_hidden_size,
             pooling_num_heads,
@@ -160,8 +164,14 @@ class PEAdapter(nn.Module):
         cls = video_hidden_states[:, 0, :].unsqueeze(1)  # [B, 1, D]
         video_hidden_states = video_hidden_states[:, 1:, :]  # [B, T
 
+        cls = self.cls_projection(cls)  # [B, 1, D]
         # spatial shuffle
         video_hidden_states = self.spatial_shuffle_connector(video_hidden_states)
+
+        # concatenate projected cls token
+        video_hidden_states = torch.cat(
+            [cls, video_hidden_states], dim=1
+        ).contiguous()  # [B, T', D]
 
         # attention pooling
         video_hidden_states, t_length = self.pooling(video_hidden_states, t_length)

@@ -70,7 +70,7 @@ def test_slt_model():
 
     for n, m in model.gemma.named_modules():
         print(n)
-        m.register_forward_hook(nan_hook)
+        m.register_fordsward_hook(nan_hook)
 
     loader = data_module.train_dataloader()
     # loader = data_module.val_dataloader()
