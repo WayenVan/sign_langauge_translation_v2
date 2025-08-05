@@ -11,6 +11,9 @@ from albumentations import (
 )
 from ..transforms import JitteredUniformSampleVideo, UniformSampleVideo, ToTensorVideo
 
+MEAN = (0.5, 0.5, 0.5)
+STD = (0.5, 0.5, 0.5)
+
 
 class SLTGeneralPiplineTrain:
     def __init__(self, height=224, width=224, downsample_rate=1):
@@ -27,8 +30,8 @@ class SLTGeneralPiplineTrain:
             [
                 ColorJitter(p=0.75),
                 Normalize(
-                    mean=(0.485, 0.456, 0.406),
-                    std=(0.229, 0.224, 0.225),
+                    mean=MEAN,
+                    std=STD,
                     max_pixel_value=1.0,
                 ),
                 HorizontalFlip(p=0.5),
@@ -75,8 +78,8 @@ class SLTGeneralPiplineTest:
         self.warp = Compose(
             [
                 Normalize(
-                    mean=(0.485, 0.456, 0.406),
-                    std=(0.229, 0.224, 0.225),
+                    mean=MEAN,
+                    std=STD,
                     max_pixel_value=1.0,
                 ),
             ],
