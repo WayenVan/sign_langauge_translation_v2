@@ -84,7 +84,11 @@ def test_datamodule():
         print(batch["text_input"][0])
         print(batch["lang"][0])
         # print(batch["text_input"][0])
-        # print(batch["text_input_ids"][0])
+        out = tokenizer.decode(
+            batch["text_input_ids"][0][batch["text_label_mask"][0] == 1],
+            skip_special_tokens=False,
+        )
+        print(out)
         # print(batch["text_label_mask"][0])
         # print(batch["target_text"])
         # pass
