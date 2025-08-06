@@ -441,6 +441,7 @@ class Gemma3SLT(LightningModule):
             loss,
             prog_bar=True,
             sync_dist=True,
+            on_epoch=True,
         )
 
         return loss
