@@ -14,7 +14,7 @@ from omegaconf import OmegaConf, DictConfig
 
 from hydra.utils import instantiate
 
-from typing import List
+from typing import List, Union, Optional, Dict, Tuple
 from transformers import Gemma3ForConditionalGeneration, get_scheduler
 from torch import optim
 from torch.optim import lr_scheduler as scheduler
@@ -31,7 +31,7 @@ from transformers.models.gemma.tokenization_gemma_fast import GemmaTokenizerFast
 from transformers.models.gemma3.configuration_gemma3 import Gemma3Config
 from peft import get_peft_model, LoraConfig, TaskType
 
-from transformers.modeling_outputs import BaseModelOutput
+from transformers.generation.utils import GenerateOutput
 from torchmetrics import Accuracy
 from torchmetrics.text import BLEUScore
 from typing import Any
@@ -266,7 +266,7 @@ class Gemma3SLT(LightningModule):
         video_length: Tensor,  # [B]
         text_input_ids: Tensor,  # [B, L]
         text_attention_mask: Tensor,  # [B, L]
-    ) -> List[str]:
+    ) -> Union[GenerateOutput, torch.LongTensor]:
         B = video_length.shape[0]
 
         input = self.prepare_for_casual_lm(
@@ -467,7 +467,7 @@ class Gemma3SLT(LightningModule):
 
         self.train_accu_visual.reset()
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch: dict, batch_idx: int):
         batch = self.dispatch_batch(batch)
 
         output = self.generate(
