@@ -50,7 +50,7 @@ val:
 
 test: null
 
-fraction_dataset: true
+fraction_dataset: false
 train_fraction: 0.3
 val_fraction: 1.0
 test_fraction: 1.0

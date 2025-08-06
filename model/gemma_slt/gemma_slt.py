@@ -121,11 +121,18 @@ class Gemma3SLT(LightningModule):
     def _init_gemma_model(self) -> None:
         mname = self.cfg.model.mname
         # mname = "google/gemma-3-4b-it"
+        #
+        if self.cfg.model.llm_dtype == "bfloat16":
+            # Use bfloat16 for better performance on TPUs
+            torch_dtype = torch.bfloat16
+        elif self.cfg.model.llm_dtype == "float16":
+            # Use float16 for better performance on GPUs
+            torch_dtype = torch.float16
 
         gemma = Gemma3ForConditionalGeneration.from_pretrained(
             mname,
             # torch_dtype=torch.bfloat16,  # Use bfloat16 for better performance on TPUs
-            torch_dtype=torch.bfloat16,  # Use bfloat16 for better performance on TPUs
+            torch_dtype=torch_dtype,  # Use float16 for better performance on GPUs
             # attn_implementation="flash_attention_2",  # Use flash attention for better performance
             attn_implementation="eager",  # Use eager attention for better compatibility
         )

@@ -28,3 +28,5 @@ lora_config:
 
 chat_template: jinjas/gemma_slt.jinja
 random_video_mask: 0.0
+
+llm_dtype: bfloat16

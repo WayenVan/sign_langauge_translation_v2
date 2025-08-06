@@ -11,15 +11,19 @@ data:
   train:
     loader_kwargs:
       batch_size: 2
-      num_workers: 8
+      num_workers: 6
   val:
     loader_kwargs:
       batch_size: 2
-      num_workers: 8
+      num_workers: 6
 
 max_epochs: 200
-devices: [2, 3, 4, 5, 6, 7]
+devices: [0, 1]
+# precision: 16-mixed
 precision: bf16-mixed
+
+model:
+  llm_dtype: bfloat16
 
 engine:
   optimizer:
