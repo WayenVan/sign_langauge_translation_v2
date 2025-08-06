@@ -49,3 +49,8 @@ val:
     prefetch_factor: 2
 
 test: null
+
+fraction_dataset: true
+train_fraction: 0.3
+val_fraction: 1.0
+test_fraction: 1.0
