@@ -7,15 +7,27 @@ backbone:
   _target_: model.gemma_slt.PerceptionEncoderBackbone
   id: PE-Lang-L14-448
 
+# visual_adapter:
+#   _target_: model.gemma_slt.PEAdapter
+#   input_hidden_size: 1024
+#   output_hidden_size: 2560
+#   spatial_scale_factor: 4
+#   temporal_scale_factor: 2
+#   pooling_num_probe: 1
+#   pooling_num_heads: 4
+#   pooling_mlp_ratio: 4
+
 visual_adapter:
-  _target_: model.gemma_slt.PEAdapter
-  input_hidden_size: 1024
-  output_hidden_size: 2560
-  spatial_scale_factor: 4
+  _target_: model.gemma_slt.TokenSampleAdapter
+  hidden_size: 1024
+  target_hidden_size: 2560
+  num_heads: 4
+  num_layers: 1
+  num_extra_queries: 1
   temporal_scale_factor: 2
-  pooling_num_probe: 1
-  pooling_num_heads: 4
-  pooling_mlp_ratio: 4
+  mlp_depth: 2
+  attn_drop: 0.0
+  proj_drop: 0.0
 
 visual_encoder_layer_scale: 1
 # connector_depth: 1

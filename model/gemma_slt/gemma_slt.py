@@ -133,8 +133,8 @@ class Gemma3SLT(LightningModule):
             mname,
             # torch_dtype=torch.bfloat16,  # Use bfloat16 for better performance on TPUs
             torch_dtype=torch_dtype,  # Use float16 for better performance on GPUs
-            # attn_implementation="flash_attention_2",  # Use flash attention for better performance
-            attn_implementation="eager",  # Use eager attention for better compatibility
+            attn_implementation="flash_attention_2",  # Use flash attention for better performance
+            # attn_implementation="eager",  # Use eager attention for better compatibility
         )
         lora_config = LoraConfig(
             **self.lora_config,
@@ -416,6 +416,7 @@ class Gemma3SLT(LightningModule):
         Training step for the model.
         """
         batch = self.dispatch_batch(batch)
+        B = batch["video_length"].shape[0]
 
         assert batch["text_label_mask"] is not None, (
             "text_label_mask is required for training"
@@ -449,6 +450,7 @@ class Gemma3SLT(LightningModule):
             prog_bar=True,
             sync_dist=True,
             on_epoch=True,
+            batch_size=B,
         )
 
         return loss

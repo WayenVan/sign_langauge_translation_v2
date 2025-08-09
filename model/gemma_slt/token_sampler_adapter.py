@@ -28,12 +28,12 @@ class TokenSampleAdapter(nn.Module):
         num_heads,
         num_layers,
         num_extra_queries,
+        temporal_scale_factor=2,
         mlp_depth=1,
         mlp_ratio=2.0,
         proj_drop=0.0,
         attn_drop=0.0,
         drop_path=0.0,
-        max_length=512,
         eps=1e-6,
     ):
         super().__init__()
@@ -62,13 +62,15 @@ class TokenSampleAdapter(nn.Module):
         )
         self.norm = Gemma3RMSNorm(hidden_size, eps=eps)
         # self.positional_embedding = nn.Embedding(max_length, target_hidden_size)
+        self.temporal_shuffle_connector = TemporalShuffleConnector(
+            target_hidden_size, target_hidden_size, scale_factor=temporal_scale_factor
+        )
 
     def forward(self, x, v_length):
         # x: (B, T, HW, C)
-        B, T, HW, C = x.shape
-        x = rearrange(x, "b t hw c -> (b t) hw c")
+        BT, HW, C = x.shape
 
-        extra_queries = repeat(self.extra_queries, "1 n c -> bt n c", bt=B * T)
+        extra_queries = repeat(self.extra_queries, "1 n c -> bt n c", bt=BT)
         for block in self.blocks:
             extra_queries = block(extra_queries, x)
 
@@ -77,10 +79,10 @@ class TokenSampleAdapter(nn.Module):
         )  # (B*T, num_extra_queries, hidden_size)
 
         extra_queries = rearrange(
-            extra_queries, "(b t) n c -> b t (n c)", b=B, t=T
+            extra_queries, "bt n c -> bt (n c)"
         )  # (B, T, num_extra_queries * hidden_size)
-
         feats = self.mlp(extra_queries)  # (B, T, Target_hidden_size)
+        feats, v_length = self.temporal_shuffle_connector(feats, t_length=v_length)
 
         return feats, v_length
 
@@ -134,6 +136,36 @@ class Block(nn.Module):
         )
         x = x + self.drop_path2(self.ls2(self.mlp(self.norm2(x))))
         return x
+
+
+class TemporalShuffleConnector(nn.Module):
+    def __init__(self, input_hidden_size, output_hidden_size, scale_factor):
+        super().__init__()
+        self.scale_factor = scale_factor
+        self.modality_projection = nn.Linear(
+            input_hidden_size * scale_factor, output_hidden_size, bias=False
+        )
+
+    def temporal_shuffle(self, x, t_length, scale_factor=2):
+        # x [BT, D]
+        #
+        assert t_length.fmod(scale_factor).eq(0).all(), (
+            "temporal length of all frames must be divisible by scale_factor"
+        )
+        BT, D = x.size()
+        x = rearrange(x, "(b s) d -> b  (s d)", s=scale_factor, d=D)
+        return x
+
+    def forward(self, video_hidden_states, t_length=None):
+        video_hidden_states = self.temporal_shuffle(
+            video_hidden_states, t_length, self.scale_factor
+        )
+        video_hidden_states = self.modality_projection(video_hidden_states)
+
+        if t_length is not None:
+            t_length = t_length // self.scale_factor
+
+        return video_hidden_states, t_length
 
 
 if __name__ == "__main__":

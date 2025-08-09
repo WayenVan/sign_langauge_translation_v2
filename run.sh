@@ -10,7 +10,7 @@
 # python3 ./scripts/t5_slt_finetune.py -cn slt_finetune_8a100
 # python3 ./scripts/t5_slt_finetune_full.py -cn slt_finetune_full_8a100
 # python3 ./scripts/train_slt.py
-# python3 ./scripts/train_slt.py -cn gfslt-vlp_pretrain_ai4d
-python3 ./scripts/train_slt.py -cn gfslt-vlp_pretrain_mec
+python3 ./scripts/train_slt.py -cn gfslt-vlp_pretrain_ai4d
+# python3 ./scripts/train_slt.py -cn gfslt-vlp_pretrain_mec
 # python3 ./scripts/train.py -cn initial_train_8a100 modules.num_query_token=128
 # python3 ./scripts/train.py -cn initial_train_8a100 modules.num_query_token=128
