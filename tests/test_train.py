@@ -60,7 +60,7 @@ def init_logger(local_rank, output_dir: str):
 # NOTE: the hydra appp only inisitalize once
 @hydra.main(
     config_path="../configs",
-    config_name="gfslt-vlp_pretrain_ai4d",
+    config_name="gfslt-vlp_pretrain_mec",
     version_base="1.3.2",
 )
 def main(

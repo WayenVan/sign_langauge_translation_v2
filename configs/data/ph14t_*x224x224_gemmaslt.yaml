@@ -13,6 +13,7 @@ train:
   collator:
     _target_: data.collators.Gemma3SLTCollator
     mode: train
+    video_token_scale: 1.25
   loader_kwargs:
     batch_size: 8
     shuffle: false
@@ -34,6 +35,7 @@ val:
   collator:
     _target_: data.collators.Gemma3SLTCollator
     mode: val
+    video_token_scale: 1.25
   loader_kwargs:
     batch_size: 2
     shuffle: false
@@ -44,7 +46,7 @@ val:
 
 test: null
 
-fraction_data: False
-train_fraction: 0.3
+fraction_dataset: False
+train_fraction: 1.0
 val_fraction: 1.0
 test_fraction: 1.0

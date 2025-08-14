@@ -21,6 +21,9 @@ class Gemma3SLTCollator:
         self.mode = mode
         self.video_token_scale = video_token_scale
         self.num_extra_video_tokens = num_extra_video_tokens
+        self.image_soft_token_id = self.tokenizer.convert_tokens_to_ids(
+            "<image_soft_token>"
+        )
 
     @staticmethod
     def pad_dim_to_multiple_of_4(tensor, dim):
@@ -65,8 +68,8 @@ class Gemma3SLTCollator:
 
         video_tensor = torch.cat(videos, dim=0).contiguous()
         video_lengths_tensor = torch.tensor(video_lengths)
-        assert (video_lengths_tensor % self.video_token_scale == 0).all(), (
-            "All video lengths must be divisible by the video token scale."
+        assert (((video_lengths_tensor * self.video_token_scale) % 1) == 0).all(), (
+            "All video lengths must be integer multiples of the video token scale."
         )
 
         prompts = []
@@ -85,7 +88,7 @@ class Gemma3SLTCollator:
             if "<start_of_image>" in prompt:
                 prompt = self.inject_images(
                     prompt,
-                    video_lengths[i] // self.video_token_scale
+                    int(video_lengths[i] * self.video_token_scale)
                     + self.num_extra_video_tokens,
                 )
             prompts.append(prompt)
@@ -122,6 +125,12 @@ class Gemma3SLTCollator:
                 text_label_mask[i, -n_label:] = 1
         else:
             text_label_mask = None
+
+        assert (
+            text_src_input.input_ids.eq(self.image_soft_token_id).sum(-1)
+            == (video_lengths_tensor * self.video_token_scale).long()
+            + self.num_extra_video_tokens
+        ).all(), "The number of image soft tokens does not match the expected number."
 
         # Prepare source input
         return {

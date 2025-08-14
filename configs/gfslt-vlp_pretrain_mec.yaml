@@ -4,7 +4,8 @@ defaults:
   # - override model: mbart_slt
   - override model: gemma_slt_pe_shuffle
   # - override data: ph14t_*x224x224_gfslt
-  - override data: ph14t_*x224x224_gemmaslt_multiling
+  # - override data: ph14t_*x224x224_gemmaslt_multiling
+  - override data: ph14t_*x224x224_gemmaslt
   # - override engine: adam_cosine_anneal
 
 data:

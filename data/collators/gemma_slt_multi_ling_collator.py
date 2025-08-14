@@ -94,7 +94,7 @@ class Gemma3SLTMultilingCollator:
             if "<start_of_image>" in prompt:
                 prompt = self.inject_images(
                     prompt,
-                    video_lengths[i] // self.video_token_scale
+                    int(video_lengths[i] * self.video_token_scale)
                     + self.num_extra_video_tokens,
                 )
             prompts.append(prompt)
@@ -135,7 +135,7 @@ class Gemma3SLTMultilingCollator:
         # Prepare source input
         assert (
             text_src_input.input_ids.eq(self.image_soft_token_id).sum(-1)
-            == video_lengths_tensor // self.video_token_scale
+            == int(video_lengths_tensor * self.video_token_scale)
             + self.num_extra_video_tokens
         ).all(), "The number of image soft tokens does not match the expected number."
 

@@ -29,7 +29,7 @@ def test_slt_model():
     import polars as pl
 
     initialize(config_path="../configs")
-    cfg = compose("gfslt-vlp_pretrain_ai4d")
+    cfg = compose("gfslt-vlp_pretrain_mec")
     cfg.data.train.loader_kwargs.batch_size = 2
     cfg.data.train.loader_kwargs.num_workers = 1
     cfg.data.val.loader_kwargs.batch_size = 1
@@ -43,34 +43,34 @@ def test_slt_model():
     data_module = DataModule(cfg.data, model.tokenizer)
     data_module.setup()
 
-    # 检测nan
-    def check_nan(obj, prefix=""):
-        if isinstance(obj, torch.Tensor):
-            if torch.isnan(obj).any() or torch.isinf(obj).any():
-                return True, f"{prefix} - Tensor with NaN/Inf"
-        elif isinstance(obj, (tuple, list)):
-            for i, x in enumerate(obj):
-                has, msg = check_nan(x, prefix=f"{prefix}[{i}]")
-                if has:
-                    return True, msg
-        elif isinstance(obj, dict):
-            for k, x in obj.items():
-                has, msg = check_nan(x, prefix=f"{prefix}['{k}']")
-                if has:
-                    return True, msg
-        return False, ""
-
-    def nan_hook(module, inp, out):
-        for name, obj in [("input", inp), ("output", out)]:
-            has, msg = check_nan(obj, prefix=name)
-            if has:
-                raise RuntimeError(
-                    f"NaN/Inf found in {module.__class__.__name__} {msg}"
-                )
-
-    for n, m in model.gemma.named_modules():
-        print(n)
-        m.register_fordsward_hook(nan_hook)
+    # # 检测nan
+    # def check_nan(obj, prefix=""):
+    #     if isinstance(obj, torch.Tensor):
+    #         if torch.isnan(obj).any() or torch.isinf(obj).any():
+    #             return True, f"{prefix} - Tensor with NaN/Inf"
+    #     elif isinstance(obj, (tuple, list)):
+    #         for i, x in enumerate(obj):
+    #             has, msg = check_nan(x, prefix=f"{prefix}[{i}]")
+    #             if has:
+    #                 return True, msg
+    #     elif isinstance(obj, dict):
+    #         for k, x in obj.items():
+    #             has, msg = check_nan(x, prefix=f"{prefix}['{k}']")
+    #             if has:
+    #                 return True, msg
+    #     return False, ""
+    #
+    # def nan_hook(module, inp, out):
+    #     for name, obj in [("input", inp), ("output", out)]:
+    #         has, msg = check_nan(obj, prefix=name)
+    #         if has:
+    #             raise RuntimeError(
+    #                 f"NaN/Inf found in {module.__class__.__name__} {msg}"
+    #             )
+    #
+    # for n, m in model.gemma.named_modules():
+    #     print(n)
+    #     m.register_fordsward_hook(nan_hook)
 
     loader = data_module.train_dataloader()
     # loader = data_module.val_dataloader()

@@ -82,7 +82,7 @@ def test_datamodule():
     for batch in tqdm(train_dataloader):
         # print(batch)
         print(batch["text_input"][0])
-        print(batch["lang"][0])
+        # print(batch["lang"][0])
         # print(batch["text_input"][0])
         out = tokenizer.decode(
             batch["text_input_ids"][0][batch["text_label_mask"][0] == 1],

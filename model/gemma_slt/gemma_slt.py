@@ -133,8 +133,8 @@ class Gemma3SLT(LightningModule):
             mname,
             # torch_dtype=torch.bfloat16,  # Use bfloat16 for better performance on TPUs
             torch_dtype=torch_dtype,  # Use float16 for better performance on GPUs
-            attn_implementation="flash_attention_2",  # Use flash attention for better performance
-            # attn_implementation="eager",  # Use eager attention for better compatibility
+            # attn_implementation="flash_attention_2",  # Use flash attention for better performance
+            attn_implementation="eager",  # Use eager attention for better compatibility
         )
         lora_config = LoraConfig(
             **self.lora_config,

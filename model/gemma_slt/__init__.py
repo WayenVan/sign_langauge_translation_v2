@@ -4,6 +4,7 @@ from .gemma_slt import Gemma3SLT
 from .gemma_slt_contrastive import Gemma3SLTForContrastiveLearning
 from .pe_adapter import PEAdapter
 from .pe_backbone import PerceptionEncoderBackbone
+from .patch_merge_adapter import PatchMergeAdapter
 
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "Gemma3SLTForContrastiveLearning",
     "PEAdapter",
     "PerceptionEncoderBackbone",
+    "PatchMergeAdapter",
 ]
