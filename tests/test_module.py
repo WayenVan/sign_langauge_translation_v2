@@ -16,7 +16,7 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 def test_pe():
     import polars as pl
 
-    device = "cuda:1"
+    device = "cpu"
     initialize(config_path="../configs")
     cfg = compose("gfslt-vlp_pretrain_mec")
 

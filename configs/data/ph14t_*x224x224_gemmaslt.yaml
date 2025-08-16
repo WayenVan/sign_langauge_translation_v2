@@ -13,7 +13,7 @@ train:
   collator:
     _target_: data.collators.Gemma3SLTCollator
     mode: train
-    video_token_scale: 1.25
+    video_token_scale: 0.5
   loader_kwargs:
     batch_size: 8
     shuffle: false
@@ -35,7 +35,7 @@ val:
   collator:
     _target_: data.collators.Gemma3SLTCollator
     mode: val
-    video_token_scale: 1.25
+    video_token_scale: 0.5
   loader_kwargs:
     batch_size: 2
     shuffle: false

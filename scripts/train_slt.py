@@ -70,7 +70,7 @@ def main(cfg: DictConfig) -> None:
     wdb_config = OmegaConf.to_container(cfg, resolve=True)
     wdb_config["output_dir"] = output_dir
     lt_logger = WandbLogger(
-        name=config_name,
+        name=output_dir,
         project="sign-langauge-translation-v2",
         config=wdb_config,
     )

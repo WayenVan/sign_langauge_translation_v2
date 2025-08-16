@@ -77,6 +77,6 @@ if __name__ == "__main__":
         lora_dropout=0.1,
     )
     # print(model)
-    video = torch.randn(2, 8, 3, 224, 224)  # Example video tensor
+    video = torch.randn(18, 3, 224, 224)  # Example video tensor
     feats = model(video)
     print(feats.shape)

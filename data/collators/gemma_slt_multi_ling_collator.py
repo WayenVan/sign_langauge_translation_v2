@@ -7,7 +7,7 @@ import random
 class Gemma3SLTMultilingCollator:
     """
     collator for my mbart model, which changes lots of things from the original gfslt collator
-
+    <unused0> is used as image soft token, <unused1> is used as image sentinel
     """
 
     def __init__(
@@ -21,9 +21,7 @@ class Gemma3SLTMultilingCollator:
         self.mode = mode
         self.video_token_scale = video_token_scale
         self.num_extra_video_tokens = num_extra_video_tokens
-        self.image_soft_token_id = self.tokenizer.convert_tokens_to_ids(
-            "<image_soft_token>"
-        )
+        self.image_soft_token_id = self.tokenizer.convert_tokens_to_ids("<unused0>")
 
     @staticmethod
     def pad_dim_to_multiple_of_4(tensor, dim):
@@ -45,8 +43,8 @@ class Gemma3SLTMultilingCollator:
 
     @staticmethod
     def inject_images(prompt: str, n: int) -> str:
-        sentinel = "<start_of_image>"
-        replacement = "<image_soft_token>" * n
+        sentinel = "<unused1>"
+        replacement = "<unused0>" * n
         return prompt.replace(sentinel, replacement)
 
     def __call__(self, batch):
@@ -91,7 +89,7 @@ class Gemma3SLTMultilingCollator:
                 tokenize=False,
             )
             # inject images if needed
-            if "<start_of_image>" in prompt:
+            if "<unused1>" in prompt:
                 prompt = self.inject_images(
                     prompt,
                     int(video_lengths[i] * self.video_token_scale)

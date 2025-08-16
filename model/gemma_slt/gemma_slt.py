@@ -26,9 +26,16 @@ from misc.earth_mover_loss import masked_emd_batch
 from misc.sign_cl import SignCL
 from torch.nn.utils.rnn import pad_sequence
 
-from transformers.models.gemma3.modeling_gemma3 import Gemma3ForCausalLM
+from transformers import AutoModel, AutoConfig, AutoTokenizer
+from transformers.models.gemma3.modeling_gemma3 import (
+    Gemma3ForCausalLM,
+    Gemma3TextModel,
+)
 from transformers.models.gemma.tokenization_gemma_fast import GemmaTokenizerFast
-from transformers.models.gemma3.configuration_gemma3 import Gemma3Config
+from transformers.models.gemma3.configuration_gemma3 import (
+    Gemma3Config,
+    Gemma3TextConfig,
+)
 from peft import get_peft_model, LoraConfig, TaskType
 
 from transformers.generation.utils import GenerateOutput
@@ -60,7 +67,7 @@ class Gemma3SLT(LightningModule):
     tokenizer: GemmaTokenizerFast  # Tokenizer for Gemma
     d_model: int  # Dimension of the model
 
-    image_soft_id: int  # ID for the start of video token
+    video_soft_token_id: int  # ID for the start of video token
     start_video_embds: nn.Parameter  # Start video embeddings
     end_video_embeds: nn.Parameter  # End video embeddings
 
@@ -121,6 +128,10 @@ class Gemma3SLT(LightningModule):
     def _init_gemma_model(self) -> None:
         mname = self.cfg.model.mname
         # mname = "google/gemma-3-4b-it"
+        if mname in ["google/gemma-3-270m", "google/gemma-3-1b-it"]:
+            gemma3_cls = Gemma3ForCausalLM
+        else:
+            gemma3_cls = Gemma3ForConditionalGeneration
         #
         if self.cfg.model.llm_dtype == "bfloat16":
             # Use bfloat16 for better performance on TPUs
@@ -129,7 +140,7 @@ class Gemma3SLT(LightningModule):
             # Use float16 for better performance on GPUs
             torch_dtype = torch.float16
 
-        gemma = Gemma3ForConditionalGeneration.from_pretrained(
+        gemma = gemma3_cls.from_pretrained(
             mname,
             # torch_dtype=torch.bfloat16,  # Use bfloat16 for better performance on TPUs
             torch_dtype=torch_dtype,  # Use float16 for better performance on GPUs
@@ -151,16 +162,16 @@ class Gemma3SLT(LightningModule):
         )
         self.gemma = get_peft_model(gemma, lora_config)
 
-        self.tokenizer = GemmaTokenizerFast.from_pretrained(
+        self.tokenizer = AutoTokenizer.from_pretrained(
             mname,
         )
         with open(self.cfg.model.chat_template, "r") as f:
             self.tokenizer.chat_template = f.read()
 
-        self.gemma_config = Gemma3Config.from_pretrained(mname).get_text_config()
+        self.gemma_config = AutoConfig.from_pretrained(mname).get_text_config()
         self.d_model = self.gemma_config.hidden_size
 
-        self.image_soft_id = self.tokenizer.convert_tokens_to_ids("<image_soft_token>")
+        self.video_soft_token_id = self.tokenizer.convert_tokens_to_ids("<unused0>")
 
         self.start_video_embds = nn.Parameter(
             torch.zeros(1, self.d_model, dtype=torch.float32, device=self.device),
@@ -219,7 +230,9 @@ class Gemma3SLT(LightningModule):
                 [
                     input.input_ids[:, 1:],  # <bos>
                     torch.full(
-                        (B, 1), self.tokenizer.eos_token_id, device=self.device
+                        (B, 1),
+                        self.tokenizer.eos_token_id,
+                        device=self.device,
                     ),  # <eos>
                 ],
                 dim=1,
@@ -303,7 +316,7 @@ class Gemma3SLT(LightningModule):
             visual_output.visual_feats, t_length.tolist(), dim=0
         )  # list of [T, D]
 
-        video_mask_text = text_input_ids.eq(self.image_soft_id).long()  # [B, L]
+        video_mask_text = text_input_ids.eq(self.video_soft_token_id).long()  # [B, L]
         t_length_text = video_mask_text.sum(
             dim=1
         )  # [B], number of video tokens in text

@@ -11,11 +11,11 @@ defaults:
 data:
   train:
     loader_kwargs:
-      batch_size: 2
+      batch_size: 1
       num_workers: 6
   val:
     loader_kwargs:
-      batch_size: 2
+      batch_size: 1
       num_workers: 6
 
 max_epochs: 200
@@ -25,6 +25,7 @@ precision: bf16-mixed
 
 model:
   llm_dtype: bfloat16
+  # llm_dtype: float16
 
 engine:
   optimizer:
